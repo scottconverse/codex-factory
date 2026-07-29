@@ -13,7 +13,7 @@ process tree, and retains selection and execution evidence.
 [Worker model ladder](docs/MODEL-LADDER.md) ·
 [Changelog](CHANGELOG.md)
 
-## What 0.1.2 includes
+## What 0.1.1 includes
 
 - discovery of every installed Ollama model plus configured Sol, Terra, and Luna candidates;
 - fingerprinted analysis, structured-reasoning benchmark, structured-write,
@@ -62,7 +62,7 @@ execution, receipts, recovery, and troubleshooting.
 
 ## Important boundary
 
-Codex reports token usage after a model turn. Version 0.1.2 can reject an unsafe
+Codex reports token usage after a model turn. Version 0.1.1 can reject an unsafe
 launch and mark a terminal result over budget, but it cannot interrupt a single
 turn at an exact token count. Wall-clock timeout and process ownership are the
 hard runtime controls.
@@ -90,7 +90,7 @@ The preview server uses `http://127.0.0.1:4173` by default. Set
 
 ## Status
 
-Version 0.1.2 is an evidence-producing prototype for controlled delegation
+Version 0.1.1 is an evidence-producing prototype for controlled delegation
 experiments. It is not a campaign engine, parallel scheduler, PM control room,
 automatic merge system, semantic verifier, or hard real-time spend controller.
 Candidate availability is discovered rather than hardcoded. Qualification is
@@ -103,7 +103,6 @@ fingerprints before routing begins.
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Worker model ladder](docs/MODEL-LADDER.md)
-- [0.1.2 release notes](docs/RELEASE-NOTES-0.1.2.md)
 - [0.1.1 release notes](docs/RELEASE-NOTES-0.1.1.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
 - [Experiment plan](docs/EXPERIMENT-PLAN.md)

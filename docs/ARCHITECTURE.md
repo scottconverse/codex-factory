@@ -79,7 +79,7 @@ per-run evidence. It is intentionally outside version control.
 ### Operator skill
 
 `skills/codex-factory/` packages the dry-run, execution, and stop conditions as
-a Codex skill. Version 0.1.2 does not install the skill automatically.
+a Codex skill. Version 0.1.1 does not install the skill automatically.
 
 ## Trust boundaries
 
@@ -105,7 +105,7 @@ The system fails closed where evidence is missing:
 - an unreaped process preserves the lock;
 - nonempty output and zero exit are still reported only as process completion.
 
-## Not included in 0.1.2
+## Not included in 0.1.1
 
 - parallel scheduling;
 - campaign persistence and dependency graphs;

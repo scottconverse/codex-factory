@@ -1,6 +1,6 @@
 {
   "name": "codex-factory",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "Budgeted boss-and-worker orchestration for Codex and qualified local models.",
   "author": {
     "name": "Scott Converse"
