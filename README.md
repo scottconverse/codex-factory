@@ -77,6 +77,8 @@ The preview server uses `http://127.0.0.1:4173` by default. Set
 Version 0.1.0 is an evidence-producing prototype for controlled delegation
 experiments. It is not a campaign engine, parallel scheduler, PM control room,
 automatic merge system, semantic verifier, or hard real-time spend controller.
+Read-only delegation has narrow qualification evidence; writable Codex and local
+workers are not yet qualified on the tested host.
 
 ## Project documents
 

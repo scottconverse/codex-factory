@@ -53,3 +53,19 @@ npm.cmd run fleet:smoke -- --provider ollama --model qwen3.5:9b
 ```
 
 Add `--execute` only to run the two-worker smoke test.
+
+## Writable follow-up
+
+A later disposable-worktree trial requested two concurrent writes:
+
+- `qwen3.5:9b` received a 30,000-token local reservation. It exited normally
+  after 2,337 reported tokens but only announced intended steps; it made no
+  tool call, write, test, or commit.
+- `gpt-5.6-luna` received a 50,000-token paid reservation. It attempted the
+  task, but the effective tool policy was read-only despite the requested
+  `workspace-write` sandbox. It reported 120,868 tokens and produced no write,
+  passing test, or commit.
+
+Both processes overlapped and exited, but the integrated acceptance path did
+not run because neither worker produced a candidate. This keeps the ladder
+unchanged for read-only work and leaves writable coding unqualified.
