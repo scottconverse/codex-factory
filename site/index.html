@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Codex Factory discovers, qualifies, selects, and supervises bounded Codex and Ollama software workers with budgets, process control, and auditable receipts.">
-  <meta name="theme-color" content="#f4f1e8">
-  <meta property="og:title" content="Codex Factory — bounded AI workers, visible controls">
-  <meta property="og:description" content="Route one bounded software task to a currently qualified Codex or local model and keep the evidence.">
+  <meta name="description" content="Codex Factory discovers local and Codex worker candidates, qualifies them for exact roles, routes one bounded task, and retains the receipts.">
+  <meta name="theme-color" content="#f2efe6">
+  <meta property="og:title" content="Codex Factory — build a worker roster from evidence">
+  <meta property="og:description" content="Discover, qualify, route, and supervise bounded AI software workers. Free local capacity first; evidence always.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="social-card.svg">
-  <title>Codex Factory — bounded AI workers, visible controls</title>
+  <title>Codex Factory — build a worker roster from evidence</title>
   <link rel="icon" href="mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
@@ -29,9 +29,9 @@
         <span></span><span></span>
       </button>
       <div class="nav-links" id="nav-links">
+        <a href="#workflow">How it works</a>
         <a href="#controls">Controls</a>
-        <a href="#workflow">Workflow</a>
-        <a href="#status">Status</a>
+        <a href="#status">Boundaries</a>
         <a href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md">Manual</a>
         <a class="button button-small" href="https://github.com/scottconverse/codex-factory">View source</a>
       </div>
@@ -41,148 +41,158 @@
   <main id="main">
     <section class="hero shell" id="top">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="signal"></span> Experimental local supervisor</p>
-        <h1>Give AI workers a shift, <em>not a blank check.</em></h1>
-        <p class="lede">Codex Factory discovers the available fleet, tests each worker candidate for exact roles, selects from the qualified pool, and keeps the routing and execution evidence.</p>
+        <p class="eyebrow"><span class="signal"></span> Experimental local supervisor · v0.1.1</p>
+        <h1>Build a worker roster from what <em>actually passes.</em></h1>
+        <p class="lede">Codex Factory inventories available Ollama and configured Codex models, qualifies each exact candidate for specific work, then routes one bounded software task with visible controls and durable receipts.</p>
         <div class="hero-actions">
-          <a class="button" href="#quick-start">Run a dry shift</a>
-          <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/ARCHITECTURE.md">Read the architecture <span aria-hidden="true">→</span></a>
+          <a class="button" href="#quick-start">Qualify your fleet</a>
+          <a class="text-link" href="https://github.com/scottconverse/codex-factory">Explore the code <span aria-hidden="true">→</span></a>
         </div>
-        <ul class="hero-facts" aria-label="Release facts">
-          <li><strong>1</strong><span>worker at a time</span></li>
-          <li><strong>0</strong><span>automatic retries</span></li>
-          <li><strong>6</strong><span>retained run artifacts</span></li>
+        <ul class="hero-facts" aria-label="Operating facts">
+          <li><strong>Local first</strong><span>when a free candidate is qualified</span></li>
+          <li><strong>Role scoped</strong><span>a failure does not exile a model</span></li>
+          <li><strong>One attempt</strong><span>no hidden retry loop</span></li>
         </ul>
       </div>
 
-      <div class="route-board" aria-label="Example dry-run route preview">
-        <div class="board-top">
-          <span>SHIFT / PREVIEW</span>
-          <span class="board-status">NO PROCESS STARTED</span>
-        </div>
-        <div class="route-line">
-          <div class="route-node coordinator">
-            <span class="node-label">COORDINATOR</span>
-            <strong>Task contract</strong>
-            <small>scope · checks · exit</small>
+      <div class="roster-board" aria-label="Qualification results from the tested development host">
+        <div class="board-head">
+          <div>
+            <span class="board-kicker">LOCAL QUALIFICATION RUN</span>
+            <strong>Candidate roster</strong>
           </div>
-          <div class="route-track" aria-hidden="true"><span></span></div>
-          <div class="route-node worker">
-            <span class="node-label">ROUTE / REVIEW</span>
-            <strong>Terra</strong>
-            <small>high · read-only</small>
+          <span class="board-state"><i></i> COMPLETE</span>
+        </div>
+        <div class="board-metrics">
+          <div><strong>17</strong><span>installed models inventoried</span></div>
+          <div><strong>16</strong><span>worker-capable candidates</span></div>
+          <div><strong>48</strong><span>role checks executed</span></div>
+          <div><strong>7</strong><span>write-ready on this host</span></div>
+        </div>
+        <div class="candidate-list">
+          <div class="candidate-row candidate-heading">
+            <span>Candidate</span><span>Analysis</span><span>Benchmark</span><span>Write</span>
+          </div>
+          <div class="candidate-row">
+            <strong>qwen3.5:9b</strong><span class="pass">Pass</span><span class="pass">Pass</span><span class="pass">Pass</span>
+          </div>
+          <div class="candidate-row">
+            <strong>gemma4:12b</strong><span class="pass">Pass</span><span class="pass">Pass</span><span class="pass">Pass</span>
+          </div>
+          <div class="candidate-row">
+            <strong>nomic-embed-text</strong><span class="na">Inventory only</span><span class="dash">—</span><span class="dash">—</span>
           </div>
         </div>
-        <dl class="readout">
-          <div><dt>Provider</dt><dd>openai</dd></div>
-          <div><dt>Reservation</dt><dd>35,000 tok</dd></div>
-          <div><dt>Timeout</dt><dd>30 min</dd></div>
-          <div><dt>Execute</dt><dd class="off">false</dd></div>
-        </dl>
-        <div class="receipt-strip">
-          <span>request.json</span>
-          <span>events.jsonl</span>
-          <span>result.json</span>
-        </div>
+        <p class="board-note">Observed on the development host with Ollama 0.32.4. Results are fingerprinted and must be rerun when the model, runtime, adapter, or harness changes.</p>
       </div>
     </section>
 
-    <section class="proof-band" aria-label="Core properties">
-      <div class="shell proof-grid">
-        <span>Local-first</span>
-        <span>Qualified model selection</span>
+    <section class="truth-rail" aria-label="Current product boundaries">
+      <div class="shell">
+        <span>Serial execution</span>
         <span>Dry-run by default</span>
-        <span>Git-backed tasks</span>
-        <span>Terminal usage receipts</span>
+        <span>Paid models opt-in</span>
+        <span>Exact candidate fingerprints</span>
+        <span>Local token counts are telemetry</span>
       </div>
     </section>
 
     <section class="problem shell section">
-      <div class="section-intro">
-        <p class="eyebrow">The missing layer</p>
-        <h2>Delegation is easy. Knowing what actually happened is harder.</h2>
-      </div>
-      <div class="problem-copy">
-        <p>A model name in a prompt is not proof of routing. A finished chat is not proof of task acceptance. A timeout is not useful if the child process keeps running.</p>
-        <p>Codex Factory wraps the existing Codex CLI with a narrow operating contract: preview the exact route, persist the reservation, own one worker process, and retain a terminal receipt. The coordinator still makes the decisions.</p>
+      <div class="section-tag">01 / Why it exists</div>
+      <div class="problem-grid">
+        <div>
+          <p class="eyebrow">Model names are not capability evidence</p>
+          <h2>Stop guessing which worker should get the job.</h2>
+        </div>
+        <div class="problem-copy">
+          <p>A model can summarize correctly and still fail to return a safe file patch. A candidate can pass today and become stale after a runtime or harness change. A cheap worker is not cheap if it spins without producing a usable artifact.</p>
+          <p>Codex Factory turns those differences into an operator-visible roster. Qualification is tied to the exact candidate and role, selection prefers qualified free local capacity, and paid routes remain explicitly budget-gated.</p>
+        </div>
       </div>
     </section>
 
-    <section class="controls section" id="controls">
+    <section class="workflow section" id="workflow">
       <div class="shell">
-        <div class="section-intro split-title">
-          <div>
-            <p class="eyebrow">Controls you can inspect</p>
-            <h2>The factory floor is intentionally small.</h2>
-          </div>
-          <p>Version 0.1.1 focuses on the supervision and qualified-routing boundary that can be proven today.</p>
+        <div class="section-tag light-tag">02 / The operating loop</div>
+        <div class="section-heading inverse">
+          <p class="eyebrow">A small control plane around existing runtimes</p>
+          <h2>Discover. Qualify. Route. Supervise. Retain.</h2>
+        </div>
+        <ol class="factory-line">
+          <li>
+            <span class="step-number">01</span>
+            <div><h3>Discover the floor</h3><p>Inventory every installed Ollama model and the Codex candidates declared by the operator. Embedding-only models remain visible but are not invoked as workers.</p></div>
+          </li>
+          <li>
+            <span class="step-number">02</span>
+            <div><h3>Qualify exact roles</h3><p>Run analysis, reasoning benchmark, structured-write, or workspace-write harnesses. The latest result for the exact fingerprint wins.</p></div>
+          </li>
+          <li>
+            <span class="step-number">03</span>
+            <div><h3>Select by policy</h3><p>Require the right role and tier, then prefer a qualified free local candidate before metered Codex capacity.</p></div>
+          </li>
+          <li>
+            <span class="step-number">04</span>
+            <div><h3>Run one bounded shift</h3><p>Preview first. Admission locks the factory, reserves paid usage when applicable, starts one owned process, and never retries automatically.</p></div>
+          </li>
+          <li>
+            <span class="step-number">05</span>
+            <div><h3>Keep the receipt</h3><p>Retain the request, events, diagnostics, final message, terminal result, and usage record for coordinator acceptance.</p></div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="controls shell section" id="controls">
+      <div class="section-tag">03 / Controls</div>
+      <div class="controls-layout">
+        <div class="section-heading">
+          <p class="eyebrow">Bounded by design</p>
+          <h2>The worker does the shift. The coordinator keeps authority.</h2>
+          <p>Version 0.1.1 concentrates on admission, execution, and evidence—the narrow layer already implemented and testable.</p>
         </div>
         <div class="control-ledger">
           <article>
-            <span class="control-number">01</span>
-            <h3>Qualify, then route</h3>
-            <p>Test every worker-capable candidate against exact role harnesses, then pin the selected provider, model, sandbox, repository, and prompt.</p>
+            <span>QUALIFICATION</span>
+            <h3>Role failures stay local</h3>
+            <p>A failed structured-write check does not remove a model that still qualifies for read-only analysis.</p>
           </article>
           <article>
-            <span class="control-number">02</span>
-            <h3>Admit deliberately</h3>
-            <p>Dry-run first. Recheck the aggregate budget under a single-worker lock, then persist the reservation before launch.</p>
+            <span>ADMISSION</span>
+            <h3>Paid use is explicit</h3>
+            <p>Codex candidates require an opt-in qualification flag and a remaining aggregate reservation.</p>
           </article>
           <article>
-            <span class="control-number">03</span>
-            <h3>Own the process</h3>
-            <p>Supervise the exact child tree. Timeout and interrupt handling must reap it—or retain the lock as a stop condition.</p>
+            <span>PROCESS</span>
+            <h3>Timeouts own the process tree</h3>
+            <p>The supervisor handles timeout and interrupt cleanup; an unreaped process preserves the lock as a stop condition.</p>
           </article>
           <article>
-            <span class="control-number">04</span>
-            <h3>Separate facts</h3>
-            <p><code>process_completed</code> means the CLI produced a terminal artifact. It never masquerades as acceptance.</p>
+            <span>EVIDENCE</span>
+            <h3>Completion is not acceptance</h3>
+            <p>A clean CLI exit is recorded as process completion. It does not claim the requested work is correct.</p>
           </article>
         </div>
       </div>
-    </section>
-
-    <section class="workflow shell section" id="workflow">
-      <div class="section-intro">
-        <p class="eyebrow">One bounded shift</p>
-        <h2>From task contract to evidence.</h2>
-      </div>
-      <ol class="shift-line">
-        <li>
-          <span>1</span>
-          <div><h3>Write the contract</h3><p>Unique ID, user-visible outcome, acceptance criteria, allowed paths, and runnable checks.</p></div>
-        </li>
-        <li>
-          <span>2</span>
-          <div><h3>Preview the route</h3><p>Inspect the model, provider, reasoning, sandbox, reservation, timeout, and exact command.</p></div>
-        </li>
-        <li>
-          <span>3</span>
-          <div><h3>Execute once</h3><p>The runner locks admission, records the reservation, starts one child, and never retries automatically.</p></div>
-        </li>
-        <li>
-          <span>4</span>
-          <div><h3>Verify independently</h3><p>Read the final artifact and run the task checks. Integrate only the evidence-supported result.</p></div>
-        </li>
-      </ol>
     </section>
 
     <section class="routing section">
       <div class="shell routing-layout">
-        <div class="section-intro">
-          <p class="eyebrow">Default routing policy</p>
-          <h2>Match the worker to the risk.</h2>
-          <p>These checked-in tiers are role policy. Current qualification evidence decides the model.</p>
+        <div>
+          <div class="section-tag light-tag">04 / Routing policy</div>
+          <p class="eyebrow">Checked in and inspectable</p>
+          <h2>Match evidence and cost to the work.</h2>
+          <p>These are default policy tiers, not performance guarantees. The selected model must also have a current qualification for the required role.</p>
         </div>
         <div class="route-table" role="region" aria-label="Default role policies" tabindex="0">
           <table>
-            <thead><tr><th>Work</th><th>Tier</th><th>Qualification</th><th>Sandbox</th></tr></thead>
+            <thead><tr><th>Work</th><th>Minimum tier</th><th>Required evidence</th><th>Access</th></tr></thead>
             <tbody>
-              <tr><td>Mechanical</td><td>Economy+</td><td>Analysis</td><td>Read-only</td></tr>
-              <tr><td>Standard</td><td>Standard+</td><td>Workspace write</td><td>Workspace-write</td></tr>
-              <tr><td>Review</td><td>Standard+</td><td>Analysis</td><td>Read-only</td></tr>
+              <tr><td>Mechanical</td><td>Economy</td><td>Analysis</td><td>Read-only</td></tr>
+              <tr><td>Standard</td><td>Standard</td><td>Workspace write</td><td>Workspace-write</td></tr>
+              <tr><td>Review</td><td>Standard</td><td>Analysis</td><td>Read-only</td></tr>
               <tr><td>Critical</td><td>Premium</td><td>Workspace write</td><td>Workspace-write</td></tr>
-              <tr><td>Local read</td><td>Economy+</td><td>Analysis</td><td>Read-only</td></tr>
+              <tr><td>Local read</td><td>Economy</td><td>Analysis</td><td>Read-only</td></tr>
             </tbody>
           </table>
         </div>
@@ -190,91 +200,110 @@
     </section>
 
     <section class="evidence shell section">
-      <div class="evidence-visual" aria-label="Run artifacts connected to a terminal receipt">
-        <div class="artifact source">request.json<small>admission</small></div>
-        <div class="artifact stream">events.jsonl<small>execution</small></div>
-        <div class="artifact result">result.json<small>terminal</small></div>
-        <svg viewBox="0 0 580 210" role="img" aria-label="Lines connect request, execution events, and terminal result">
-          <path d="M110 105H270" />
-          <path d="M310 105H470" />
-          <circle cx="290" cy="105" r="10" />
-        </svg>
+      <div class="receipt-stack" aria-label="Example retained run artifacts">
+        <div class="receipt-card request-card">
+          <span>01 / ADMISSION</span>
+          <strong>request.json</strong>
+          <small>route · scope · reservation</small>
+        </div>
+        <div class="receipt-card events-card">
+          <span>02 / EXECUTION</span>
+          <strong>events.jsonl</strong>
+          <small>model events · usage</small>
+        </div>
+        <div class="receipt-card result-card">
+          <span>03 / TERMINAL</span>
+          <strong>result.json</strong>
+          <small>exit · cleanup · disposition</small>
+        </div>
       </div>
       <div class="evidence-copy">
-        <p class="eyebrow">Evidence, not theater</p>
-        <h2>Keep the artifacts that let a coordinator disagree with the worker.</h2>
-        <p>Every run retains the exact request, JSONL events, stderr diagnostics, final message, terminal result, and aggregate usage record. Raw receipts stay local and ignored by Git because they may contain repository data.</p>
-        <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md#understand-results">Read the receipt guide <span aria-hidden="true">→</span></a>
+        <div class="section-tag">05 / Receipts</div>
+        <p class="eyebrow">Evidence survives the shift</p>
+        <h2>Enough context to accept, reject, or investigate.</h2>
+        <p>Each run retains the exact request, JSONL events, stderr diagnostics, final message, terminal result, and aggregate usage record. Raw receipts remain local and ignored by Git because they can contain repository data.</p>
+        <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md#understand-results">Understand the artifacts <span aria-hidden="true">→</span></a>
       </div>
     </section>
 
     <section class="quick-start section" id="quick-start">
-      <div class="shell quick-layout">
-        <div>
-          <p class="eyebrow">First run</p>
-          <h2>Start with a preview.</h2>
-          <p>Clone, verify, and inspect a read-only local route. Omit <code>--execute</code> until the preview is correct.</p>
-          <a class="button button-inverse" href="https://github.com/scottconverse/codex-factory">Open the repository</a>
-        </div>
-        <div class="terminal">
-          <div class="terminal-bar"><span></span><span></span><span></span><b>PowerShell</b></div>
-          <pre><code><span class="prompt">&gt;</span> git clone https://github.com/scottconverse/codex-factory.git
+      <div class="shell">
+        <div class="section-tag light-tag">06 / First shift</div>
+        <div class="quick-layout">
+          <div>
+            <p class="eyebrow">Node.js 24+ · Git · Codex CLI</p>
+            <h2>Inventory first. Spend nothing.</h2>
+            <p>The qualification command previews every applicable candidate and harness pair by default. Add <code>--execute</code> to test free local candidates. Paid Codex models remain excluded unless you add <code>--include-paid</code>.</p>
+            <a class="button button-inverse" href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md">Open the user manual</a>
+          </div>
+          <div class="terminal" aria-label="Quick start commands">
+            <div class="terminal-bar"><span></span><span></span><span></span><b>PowerShell</b></div>
+            <pre><code><span class="prompt">&gt;</span> git clone https://github.com/scottconverse/codex-factory.git
 <span class="prompt">&gt;</span> cd codex-factory
 <span class="prompt">&gt;</span> npm.cmd run check
 
+<span class="comment"># Preview candidate × harness plan</span>
+<span class="prompt">&gt;</span> npm.cmd run fleet:qualify
+
+<span class="comment"># Execute free local qualification</span>
+<span class="prompt">&gt;</span> npm.cmd run fleet:qualify -- --execute
+
+<span class="comment"># Preview one automatically selected route</span>
 <span class="prompt">&gt;</span> node scripts/run-worker.mjs `
     --task-id inspect-repo `
     --role local-read `
     --cwd . `
-    --prompt-file examples/inventory.prompt.md
-
-<span class="muted">"execute": false</span></code></pre>
+    --prompt-file examples/inventory.prompt.md</code></pre>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="status shell section" id="status">
-      <div class="status-main">
-        <p class="eyebrow">Release status</p>
-        <h2>Useful for controlled experiments. Not yet an autonomous factory.</h2>
-        <p>Version 0.1.1 is an evidence-producing prototype. It discovers candidates, binds qualifications to exact runtime fingerprints and roles, selects qualified capacity, and supervises one worker at a time.</p>
-      </div>
-      <div class="status-columns">
+      <div class="section-tag">07 / Honest boundary</div>
+      <div class="status-intro">
         <div>
-          <h3>Included now</h3>
-          <ul class="check-list">
-            <li>One supervised worker</li>
-            <li>OpenAI and Ollama routes</li>
-            <li>Persistent reservations</li>
-            <li>Process-tree cleanup</li>
-            <li>Machine-readable receipts</li>
+          <p class="eyebrow">Evidence-producing prototype</p>
+          <h2>A useful supervisor. Not yet the whole factory.</h2>
+        </div>
+        <p>Version 0.1.1 proves discovered, qualification-gated selection and bounded single-worker execution. It is suitable for controlled experiments on a host you operate—not unattended product delivery.</p>
+      </div>
+      <div class="boundary-grid">
+        <div class="boundary-now">
+          <span class="boundary-label">WORKING NOW</span>
+          <ul>
+            <li>Dynamic Ollama inventory plus configured Luna, Terra, and Sol candidates</li>
+            <li>Exact, role-scoped qualification fingerprints</li>
+            <li>Free-local-first selection from the qualified pool</li>
+            <li>Constrained local structured-file patch path</li>
+            <li>One owned worker process with timeout and receipts</li>
           </ul>
         </div>
-        <div>
-          <h3>Not in 0.1.1</h3>
-          <ul class="plain-list">
-            <li>Hard in-turn token cutoff</li>
-            <li>Parallel scheduling</li>
-            <li>Campaign dependency graph</li>
-            <li>Automatic acceptance or merge</li>
-            <li>PM-facing control room</li>
+        <div class="boundary-not">
+          <span class="boundary-label">NOT IN 0.1.1</span>
+          <ul>
+            <li>Parallel scheduler or campaign dependency graph</li>
+            <li>PM-facing control room or remote web application</li>
+            <li>Automatic semantic acceptance, merge, or release</li>
+            <li>MCP server or autonomous repository-wide local agents</li>
+            <li>Hard token cutoff during a Codex turn</li>
           </ul>
         </div>
       </div>
-      <aside class="limit-note">
-        <strong>Important budget boundary</strong>
-        <p>Codex exposes usage after a turn. The runner can refuse admission and reject an over-budget result, but it cannot stop a single turn at an exact token count.</p>
+      <aside class="budget-note">
+        <strong>Two kinds of budget</strong>
+        <p>Local Ollama workers use wall time, concurrency, attempts, context/output safety, and cleanup; token counts are telemetry. Metered Codex workers use aggregate token reservations, but Codex reports final usage only after a turn, so the runner cannot interrupt at an exact token count.</p>
       </aside>
     </section>
 
     <section class="final-cta">
       <div class="shell final-inner">
         <div>
-          <p class="eyebrow">Build from the evidence</p>
-          <h2>See how much factory you already have.</h2>
+          <p class="eyebrow">Start with the roster</p>
+          <h2>Find the workers that earn a place on your floor.</h2>
         </div>
-        <div>
-          <a class="button button-inverse" href="https://github.com/scottconverse/codex-factory">Explore Codex Factory 0.1.1</a>
+        <div class="final-actions">
+          <a class="button button-inverse" href="https://github.com/scottconverse/codex-factory">Get Codex Factory 0.1.1</a>
           <a class="text-link light" href="https://github.com/scottconverse/codex-factory/blob/main/CONTRIBUTING.md">Contributing guide <span aria-hidden="true">→</span></a>
         </div>
       </div>
@@ -287,7 +316,7 @@
         <img src="mark.svg" alt="" width="34" height="34">
         <span>Codex Factory</span>
       </div>
-      <p>Experimental local supervision for bounded AI software workers.</p>
+      <p>Open-source experimental supervision for bounded AI software workers. Apache 2.0 licensed.</p>
       <div class="footer-links">
         <a href="https://github.com/scottconverse/codex-factory">Repository</a>
         <a href="https://github.com/scottconverse/codex-factory/releases">Releases</a>
