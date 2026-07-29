@@ -1,14 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#f4f1e8"/>
-  <path d="M0 0h1200v18H0z" fill="#163f33"/>
-  <g transform="translate(90 90)">
-    <rect width="78" height="78" rx="9" fill="#163f33"/>
-    <path d="M16 23h22v13H16zm25 20h22v13H41z" fill="#f4f1e8"/>
-    <path d="M38 29h9v21h-9zM11 61h56" fill="#e56c3e" stroke="#e56c3e" stroke-width="4"/>
+  <rect width="1200" height="630" fill="#f2efe6"/>
+  <path d="M0 0h1200v18H0z" fill="#143d31"/>
+  <path d="M0 516h1200v114H0z" fill="#0b2a21"/>
+  <g opacity=".13" stroke="#17201c">
+    <path d="M0 64h1200M0 128h1200M0 192h1200M0 256h1200M0 320h1200M0 384h1200M0 448h1200"/>
+    <path d="M64 18v498M128 18v498M192 18v498M256 18v498M320 18v498M384 18v498M448 18v498M512 18v498M576 18v498M640 18v498M704 18v498M768 18v498M832 18v498M896 18v498M960 18v498M1024 18v498M1088 18v498M1152 18v498"/>
   </g>
-  <text x="90" y="245" fill="#17211d" font-family="Georgia,serif" font-size="80">Codex Factory</text>
-  <text x="90" y="335" fill="#b64624" font-family="Georgia,serif" font-size="52">Give AI workers a shift,</text>
-  <text x="90" y="397" fill="#b64624" font-family="Georgia,serif" font-size="52">not a blank check.</text>
-  <text x="90" y="500" fill="#53615b" font-family="Segoe UI,sans-serif" font-size="28">Explicit routes · bounded processes · auditable receipts</text>
-  <text x="1010" y="555" fill="#163f33" font-family="Consolas,monospace" font-size="24">0.1.1</text>
+  <g transform="translate(78 70)">
+    <rect width="72" height="72" rx="7" fill="#143d31"/>
+    <path d="M14 21h21v12H14zm24 19h21v12H38z" fill="#f2efe6"/>
+    <path d="M35 27h9v20h-9zM10 57h52" stroke="#df6338" stroke-width="4"/>
+  </g>
+  <text x="174" y="116" fill="#17201c" font-family="Segoe UI,sans-serif" font-size="30" font-weight="700">CODEX FACTORY</text>
+  <text x="1070" y="112" fill="#a63f20" font-family="Consolas,monospace" font-size="22">0.1.1</text>
+  <text x="78" y="250" fill="#17201c" font-family="Georgia,serif" font-size="71">Build a worker roster from</text>
+  <text x="78" y="334" fill="#a63f20" font-family="Georgia,serif" font-size="71">what actually passes.</text>
+  <text x="78" y="425" fill="#59635d" font-family="Segoe UI,sans-serif" font-size="27">Discover · qualify · route · supervise · retain</text>
+  <text x="78" y="574" fill="#dce7e1" font-family="Consolas,monospace" font-size="22">FREE LOCAL CAPACITY FIRST  /  ONE BOUNDED SHIFT  /  DURABLE RECEIPTS</text>
 </svg>
