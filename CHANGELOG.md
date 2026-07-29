@@ -2,6 +2,15 @@
 
 All notable changes to Codex Factory are documented here.
 
+## [Unreleased]
+
+### Added
+
+- Experimental two-worker concurrency smoke harness with explicit Ollama and
+  OpenAI routes.
+- Evidence-backed preferred worker ladder led by `qwen3.5:9b`, then Luna and
+  Terra.
+
 ## [0.1.0] - 2026-07-29
 
 Initial experimental release.

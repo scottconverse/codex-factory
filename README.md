@@ -10,6 +10,7 @@ events, result, and terminal usage as evidence.
 [Website](https://scottconverse.github.io/codex-factory/) ·
 [User manual](docs/USER-MANUAL.md) ·
 [Architecture](docs/ARCHITECTURE.md) ·
+[Worker model ladder](docs/MODEL-LADDER.md) ·
 [Changelog](CHANGELOG.md)
 
 ## What 0.1.0 includes
@@ -81,6 +82,7 @@ automatic merge system, semantic verifier, or hard real-time spend controller.
 
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Worker model ladder](docs/MODEL-LADDER.md)
 - [0.1.0 release notes](docs/RELEASE-NOTES-0.1.0.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
 - [Experiment plan](docs/EXPERIMENT-PLAN.md)

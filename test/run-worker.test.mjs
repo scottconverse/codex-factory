@@ -4,6 +4,7 @@ import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildInvocation, classifyResult, parseArgs, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
+import { buildSmokeInvocation, validateSmokeArtifact, workersOverlap } from "../scripts/fleet-smoke.mjs";
 
 test("parseArgs keeps execution opt-in", () => {
   assert.deepEqual(parseArgs(["--task-id", "one", "--role", "mechanical"]), { taskId: "one", role: "mechanical", execute: false });
@@ -88,4 +89,47 @@ test("taskWasAttempted rejects reuse of a durable task ID", (t) => {
   writeFileSync(ledgerPath, '{"stage":"reserved","taskId":"already-ran","paid":true,"reservedTokens":10}\n');
   assert.equal(taskWasAttempted(ledgerPath, "already-ran"), true);
   assert.equal(taskWasAttempted(ledgerPath, "new-task"), false);
+});
+
+test("fleet smoke requires overlapping worker intervals", () => {
+  assert.equal(workersOverlap([
+    { startedAtMs: 100, finishedAtMs: 300 },
+    { startedAtMs: 200, finishedAtMs: 400 },
+  ]), true);
+  assert.equal(workersOverlap([
+    { startedAtMs: 100, finishedAtMs: 200 },
+    { startedAtMs: 200, finishedAtMs: 300 },
+  ]), false);
+});
+
+test("fleet smoke validates independently observed repository facts", () => {
+  assert.deepEqual(
+    validateSmokeArtifact("package", '{"task":"package","name":"codex-factory","version":"0.1.0"}'),
+    { task: "package", name: "codex-factory", version: "0.1.0" },
+  );
+  assert.deepEqual(
+    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"localModel":"qwen3.5:4b"}'),
+    { task: "config", maxConcurrentWorkers: 1, localModel: "qwen3.5:4b" },
+  );
+  assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.0"}'), /Package artifact mismatch/);
+});
+
+test("fleet smoke pins local and OpenAI providers explicitly", () => {
+  const local = buildSmokeInvocation({
+    provider: "ollama",
+    model: "local-model",
+    reasoningEffort: "low",
+    outputPath: "out.txt",
+  });
+  assert.deepEqual(local.args.slice(0, 4), ["exec", "--oss", "--local-provider", "ollama"]);
+  assert.ok(local.args.includes("local-model"));
+
+  const openai = buildSmokeInvocation({
+    provider: "openai",
+    model: "gpt-5.6-luna",
+    reasoningEffort: "low",
+    outputPath: "out.txt",
+  });
+  assert.equal(openai.args.includes("--oss"), false);
+  assert.ok(openai.args.includes("gpt-5.6-luna"));
 });
