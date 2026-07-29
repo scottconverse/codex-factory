@@ -35,6 +35,18 @@ Terminal reconciliation
 Coordinator acceptance
 ```
 
+The local patch path avoids autonomous model tools:
+
+```text
+Task JSON + declared context
+    -> direct Ollama structured generation
+    -> validate file paths and text artifacts
+    -> write only inside generated Git worktree
+    -> stage and derive real Git diff
+    -> run declared check
+    -> commit only on green
+```
+
 ## Components
 
 ### Configuration
@@ -48,6 +60,17 @@ Provider/accounting mismatches are rejected.
 constructs an explicit `codex exec` invocation, sends the prompt through stdin,
 and owns the launched process tree.
 
+`scripts/run-local-patch.mjs` calls Ollama directly. The model receives only
+declared file contents and returns complete text for allowlisted files. It
+cannot select commands or filesystem paths outside the task contract.
+
+`scripts/factory-fleet.mjs` ports the proven DevHarmonics candidate pattern:
+runtime discovery, exact model/runtime/harness fingerprints, role-scoped
+qualification, a structured-reasoning benchmark for mutating work, capability
+admission, tier fit, and free-local-first selection.
+`scripts/qualify-fleet.mjs` exercises every worker-capable discovered candidate;
+embedding-only inventory remains visible but is not treated as a subagent.
+
 ### Durable local state
 
 `.codex-factory/` contains an execution lock, an append-only usage ledger, and
@@ -56,7 +79,7 @@ per-run evidence. It is intentionally outside version control.
 ### Operator skill
 
 `skills/codex-factory/` packages the dry-run, execution, and stop conditions as
-a Codex skill. Version 0.1.0 does not install the skill automatically.
+a Codex skill. Version 0.1.1 does not install the skill automatically.
 
 ## Trust boundaries
 
@@ -68,6 +91,7 @@ a Codex skill. Version 0.1.0 does not install the skill automatically.
 - Operating-system process controls are the final wall-clock stop mechanism.
 - Terminal usage events are trusted for accounting because no in-turn usage
   signal is currently exposed.
+- Local token counts are telemetry, not financial admission controls.
 
 ## Failure policy
 
@@ -81,7 +105,7 @@ The system fails closed where evidence is missing:
 - an unreaped process preserves the lock;
 - nonempty output and zero exit are still reported only as process completion.
 
-## Not included in 0.1.0
+## Not included in 0.1.1
 
 - parallel scheduling;
 - campaign persistence and dependency graphs;
@@ -89,5 +113,4 @@ The system fails closed where evidence is missing:
 - semantic acceptance verification;
 - remote control plane or web application;
 - MCP server;
-- model qualification registry;
 - cross-provider performance history.

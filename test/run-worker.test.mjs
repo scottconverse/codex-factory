@@ -3,7 +3,9 @@ import test from "node:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildInvocation, classifyResult, parseArgs, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
+import { buildInvocation, classifyResult, parseArgs, resolveRouteCandidate, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
+import { buildSmokeInvocation, validateSmokeArtifact, workersOverlap } from "../scripts/fleet-smoke.mjs";
+import { candidateFingerprint, discoverCandidatePool } from "../scripts/factory-fleet.mjs";
 
 test("parseArgs keeps execution opt-in", () => {
   assert.deepEqual(parseArgs(["--task-id", "one", "--role", "mechanical"]), { taskId: "one", role: "mechanical", execute: false });
@@ -13,7 +15,7 @@ test("parseArgs keeps execution opt-in", () => {
 test("validateConfig rejects concurrency and retry expansion", () => {
   const base = {
     version: 1,
-    budgets: { aggregatePaidTokens: 1, aggregateLocalTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 2, maxConcurrentWorkers: 1 },
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 2, maxConcurrentWorkers: 1 },
     routes: {},
   };
   assert.throws(() => validateConfig(base), /exactly one attempt/);
@@ -25,7 +27,7 @@ test("validateConfig rejects concurrency and retry expansion", () => {
 test("validateConfig rejects unaccounted providers and invalid reasoning effort", () => {
   const config = {
     version: 1,
-    budgets: { aggregatePaidTokens: 1, aggregateLocalTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 1, maxConcurrentWorkers: 1 },
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 1, maxConcurrentWorkers: 1 },
     routes: {
       review: { provider: "openai", model: "model", reasoningEffort: "high", tokenReservation: 1, sandbox: "read-only", paid: false },
     },
@@ -34,6 +36,25 @@ test("validateConfig rejects unaccounted providers and invalid reasoning effort"
   config.routes.review.paid = true;
   config.routes.review.reasoningEffort = "unbounded";
   assert.throws(() => validateConfig(config), /unsupported reasoning effort/);
+});
+
+test("validateConfig treats local tokens as telemetry rather than admission budget", () => {
+  const config = {
+    version: 1,
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 1, maxConcurrentWorkers: 1 },
+    routes: {
+      local: {
+        provider: "ollama",
+        model: "local-model",
+        reasoningEffort: "low",
+        sandbox: "read-only",
+        paid: false,
+      },
+    },
+  };
+  assert.equal(validateConfig(config), config);
+  config.routes.local.tokenReservation = 10;
+  assert.throws(() => validateConfig(config), /must not declare a token reservation/);
 });
 
 test("buildInvocation pins provider, model, reasoning, sandbox, and ephemeral JSONL", () => {
@@ -46,6 +67,33 @@ test("buildInvocation pins provider, model, reasoning, sandbox, and ephemeral JS
   assert.ok(invocation.args.includes("--ephemeral"));
   assert.ok(invocation.args.includes("--json"));
   assert.ok(invocation.args.includes("read-only"));
+});
+
+test("route resolution selects from all currently qualified candidates instead of a fixed model", () => {
+  const config = {
+    routes: {
+      mechanical: { qualificationRole: "analysis", requiredTier: "economy", sandbox: "read-only" },
+    },
+  };
+  const candidates = discoverCandidatePool({
+    config: {
+      candidates: {
+        openai: [{ model: "gpt-5.6-luna", tier: "economy", reasoningEffort: "low", paid: true, tokenReservation: 20_000 }],
+      },
+    },
+    ollama: { runtimeVersion: "0.11.4", models: ["qwen3.5:9b"] },
+  });
+  const local = candidates[0];
+  const paid = candidates[1];
+  const qualifications = [
+    { candidateId: local.id, role: "analysis", fingerprint: candidateFingerprint(local, "analysis"), passed: true },
+    { candidateId: paid.id, role: "analysis", fingerprint: candidateFingerprint(paid, "analysis"), passed: true },
+  ];
+  const route = resolveRouteCandidate({ config, role: "mechanical", candidates, qualifications });
+  assert.deepEqual(
+    { provider: route.provider, model: route.model, sandbox: route.sandbox, paid: route.paid },
+    { provider: "ollama", model: "qwen3.5:9b", sandbox: "read-only", paid: false },
+  );
 });
 
 test("summarizeUsage rejects missing receipts and counts input plus output once", () => {
@@ -88,4 +136,47 @@ test("taskWasAttempted rejects reuse of a durable task ID", (t) => {
   writeFileSync(ledgerPath, '{"stage":"reserved","taskId":"already-ran","paid":true,"reservedTokens":10}\n');
   assert.equal(taskWasAttempted(ledgerPath, "already-ran"), true);
   assert.equal(taskWasAttempted(ledgerPath, "new-task"), false);
+});
+
+test("fleet smoke requires overlapping worker intervals", () => {
+  assert.equal(workersOverlap([
+    { startedAtMs: 100, finishedAtMs: 300 },
+    { startedAtMs: 200, finishedAtMs: 400 },
+  ]), true);
+  assert.equal(workersOverlap([
+    { startedAtMs: 100, finishedAtMs: 200 },
+    { startedAtMs: 200, finishedAtMs: 300 },
+  ]), false);
+});
+
+test("fleet smoke validates independently observed repository facts", () => {
+  assert.deepEqual(
+    validateSmokeArtifact("package", '{"task":"package","name":"codex-factory","version":"0.1.1"}'),
+    { task: "package", name: "codex-factory", version: "0.1.1" },
+  );
+  assert.deepEqual(
+    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"discoverOllama":true,"configuredCodexCandidates":3}'),
+    { task: "config", maxConcurrentWorkers: 1, discoverOllama: true, configuredCodexCandidates: 3 },
+  );
+  assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.1"}'), /Package artifact mismatch/);
+});
+
+test("fleet smoke pins local and OpenAI providers explicitly", () => {
+  const local = buildSmokeInvocation({
+    provider: "ollama",
+    model: "local-model",
+    reasoningEffort: "low",
+    outputPath: "out.txt",
+  });
+  assert.deepEqual(local.args.slice(0, 4), ["exec", "--oss", "--local-provider", "ollama"]);
+  assert.ok(local.args.includes("local-model"));
+
+  const openai = buildSmokeInvocation({
+    provider: "openai",
+    model: "gpt-5.6-luna",
+    reasoningEffort: "low",
+    outputPath: "out.txt",
+  });
+  assert.equal(openai.args.includes("--oss"), false);
+  assert.ok(openai.args.includes("gpt-5.6-luna"));
 });

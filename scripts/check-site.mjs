@@ -33,7 +33,8 @@ for (const required of ["index.html", "styles.css", "app.js", "mark.svg", "socia
   if (!files.includes(required)) throw new Error(`Missing built asset: ${required}`);
 }
 
-if (!html.includes("0.1.0")) throw new Error("Landing page version is not 0.1.0");
+const version = readFileSync(path.join(root, "VERSION"), "utf8").trim();
+if (!html.includes(version)) throw new Error(`Landing page version is not ${version}`);
 if (/localhost|lorem ipsum|href=["']#["']/i.test(html)) throw new Error("Landing page contains a placeholder or private URL");
 
 process.stdout.write(`Site check passed: ${files.length} files, ${localReferences.length} local references\n`);

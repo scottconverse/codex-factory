@@ -6,7 +6,7 @@ Every worker request must name:
 - user-observable outcome;
 - acceptance criteria and runnable checks;
 - allowed repository and writable paths;
-- exact route, sandbox, token reservation, and timeout;
+- exact route, sandbox or structured-write contract, and timeout;
 - deterministic completion or failure artifact.
 
 Workers are leaves. They do not delegate, broaden scope, merge, publish, install,
@@ -20,6 +20,12 @@ the reserved amount fails the result even though the CLI exposes it only at turn
 completion. A timeout or supervisor interrupt terminates and reaps the exact
 owned child process tree. If reaping cannot be confirmed, the lock remains as a
 stop condition for operator investigation.
+
+Local Ollama work has no token reservation or aggregate token-spend budget.
+Local tokens are telemetry. Wall time, concurrency, attempts, context/output
+safety, allowlisted writes, and process cleanup are its enforced limits. Codex
+subscription usage allowances and any future paid API budget are separate
+accounting classes.
 
 `process_completed` means only that the CLI exited successfully, reported usage,
 and produced a nonempty final artifact. It is not an acceptance verdict. The
