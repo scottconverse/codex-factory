@@ -3,48 +3,60 @@
   "budgets": {
     "aggregatePaidTokens": 250000,
     "maxWorkerMinutes": 30,
+    "qualificationMinutes": 3,
     "maxAttemptsPerTask": 1,
     "maxConcurrentWorkers": 1
   },
+  "candidates": {
+    "ollama": {
+      "discover": true
+    },
+    "openai": [
+      {
+        "model": "gpt-5.6-luna",
+        "tier": "economy",
+        "reasoningEffort": "low",
+        "tokenReservation": 20000
+      },
+      {
+        "model": "gpt-5.6-terra",
+        "tier": "standard",
+        "reasoningEffort": "medium",
+        "tokenReservation": 40000
+      },
+      {
+        "model": "gpt-5.6-sol",
+        "tier": "premium",
+        "reasoningEffort": "high",
+        "tokenReservation": 60000
+      }
+    ]
+  },
   "routes": {
     "mechanical": {
-      "provider": "openai",
-      "model": "gpt-5.6-luna",
-      "reasoningEffort": "low",
-      "tokenReservation": 20000,
-      "sandbox": "read-only",
-      "paid": true
+      "qualificationRole": "analysis",
+      "requiredTier": "economy",
+      "sandbox": "read-only"
     },
     "standard": {
-      "provider": "openai",
-      "model": "gpt-5.6-terra",
-      "reasoningEffort": "medium",
-      "tokenReservation": 40000,
-      "sandbox": "workspace-write",
-      "paid": true
+      "qualificationRole": "workspace_write",
+      "requiredTier": "standard",
+      "sandbox": "workspace-write"
     },
     "review": {
-      "provider": "openai",
-      "model": "gpt-5.6-terra",
-      "reasoningEffort": "high",
-      "tokenReservation": 35000,
-      "sandbox": "read-only",
-      "paid": true
+      "qualificationRole": "analysis",
+      "requiredTier": "standard",
+      "sandbox": "read-only"
     },
     "critical": {
-      "provider": "openai",
-      "model": "gpt-5.6-sol",
-      "reasoningEffort": "high",
-      "tokenReservation": 60000,
-      "sandbox": "workspace-write",
-      "paid": true
+      "qualificationRole": "workspace_write",
+      "requiredTier": "premium",
+      "sandbox": "workspace-write"
     },
     "local-read": {
-      "provider": "ollama",
-      "model": "qwen3.5:9b",
-      "reasoningEffort": "low",
-      "sandbox": "read-only",
-      "paid": false
+      "qualificationRole": "analysis",
+      "requiredTier": "economy",
+      "sandbox": "read-only"
     }
   }
 }

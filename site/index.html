@@ -3,10 +3,10 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Codex Factory is a local supervisor for bounded Codex and Ollama software workers with explicit routes, budgets, process control, and auditable receipts.">
+  <meta name="description" content="Codex Factory discovers, qualifies, selects, and supervises bounded Codex and Ollama software workers with budgets, process control, and auditable receipts.">
   <meta name="theme-color" content="#f4f1e8">
   <meta property="og:title" content="Codex Factory — bounded AI workers, visible controls">
-  <meta property="og:description" content="Route one bounded software task to an explicit Codex or local model and keep the evidence.">
+  <meta property="og:description" content="Route one bounded software task to a currently qualified Codex or local model and keep the evidence.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="social-card.svg">
   <title>Codex Factory — bounded AI workers, visible controls</title>
@@ -43,7 +43,7 @@
       <div class="hero-copy">
         <p class="eyebrow"><span class="signal"></span> Experimental local supervisor</p>
         <h1>Give AI workers a shift, <em>not a blank check.</em></h1>
-        <p class="lede">Codex Factory routes one bounded software task to an explicit Codex or Ollama model, supervises its process, and keeps the request, events, result, and usage as evidence.</p>
+        <p class="lede">Codex Factory discovers the available fleet, tests each worker candidate for exact roles, selects from the qualified pool, and keeps the routing and execution evidence.</p>
         <div class="hero-actions">
           <a class="button" href="#quick-start">Run a dry shift</a>
           <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/ARCHITECTURE.md">Read the architecture <span aria-hidden="true">→</span></a>
@@ -90,7 +90,7 @@
     <section class="proof-band" aria-label="Core properties">
       <div class="shell proof-grid">
         <span>Local-first</span>
-        <span>Explicit model routes</span>
+        <span>Qualified model selection</span>
         <span>Dry-run by default</span>
         <span>Git-backed tasks</span>
         <span>Terminal usage receipts</span>
@@ -120,8 +120,8 @@
         <div class="control-ledger">
           <article>
             <span class="control-number">01</span>
-            <h3>Route explicitly</h3>
-            <p>Pin provider, model, reasoning effort, sandbox, repository, and prompt in the generated CLI command.</p>
+            <h3>Qualify, then route</h3>
+            <p>Test every worker-capable candidate against exact role harnesses, then pin the selected provider, model, sandbox, repository, and prompt.</p>
           </article>
           <article>
             <span class="control-number">02</span>
@@ -172,17 +172,17 @@
         <div class="section-intro">
           <p class="eyebrow">Default routing policy</p>
           <h2>Match the worker to the risk.</h2>
-          <p>These checked-in defaults are operator policy, not model-availability guarantees.</p>
+          <p>These checked-in tiers are role policy. Current qualification evidence decides the model.</p>
         </div>
-        <div class="route-table" role="region" aria-label="Default model routes" tabindex="0">
+        <div class="route-table" role="region" aria-label="Default role policies" tabindex="0">
           <table>
-            <thead><tr><th>Work</th><th>Model</th><th>Reasoning</th><th>Sandbox</th></tr></thead>
+            <thead><tr><th>Work</th><th>Tier</th><th>Qualification</th><th>Sandbox</th></tr></thead>
             <tbody>
-              <tr><td>Mechanical</td><td>Luna</td><td>Low</td><td>Read-only</td></tr>
-              <tr><td>Standard</td><td>Terra</td><td>Medium</td><td>Workspace-write</td></tr>
-              <tr><td>Review</td><td>Terra</td><td>High</td><td>Read-only</td></tr>
-              <tr><td>Critical</td><td>Sol</td><td>High</td><td>Workspace-write</td></tr>
-              <tr><td>Local read</td><td>Qwen 3.5 4B</td><td>Low</td><td>Read-only</td></tr>
+              <tr><td>Mechanical</td><td>Economy+</td><td>Analysis</td><td>Read-only</td></tr>
+              <tr><td>Standard</td><td>Standard+</td><td>Workspace write</td><td>Workspace-write</td></tr>
+              <tr><td>Review</td><td>Standard+</td><td>Analysis</td><td>Read-only</td></tr>
+              <tr><td>Critical</td><td>Premium</td><td>Workspace write</td><td>Workspace-write</td></tr>
+              <tr><td>Local read</td><td>Economy+</td><td>Analysis</td><td>Read-only</td></tr>
             </tbody>
           </table>
         </div>
@@ -237,7 +237,7 @@
       <div class="status-main">
         <p class="eyebrow">Release status</p>
         <h2>Useful for controlled experiments. Not yet an autonomous factory.</h2>
-        <p>Version 0.1.0 is an evidence-producing prototype. It proves explicit routing, serial admission, process supervision, and receipt capture on the current Codex CLI surface.</p>
+        <p>Version 0.1.0 is an evidence-producing prototype. It discovers candidates, binds qualifications to exact runtime fingerprints and roles, selects qualified capacity, and supervises one worker at a time.</p>
       </div>
       <div class="status-columns">
         <div>

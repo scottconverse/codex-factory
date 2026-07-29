@@ -16,6 +16,7 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OLLAMA_GENERATE_URL = "http://127.0.0.1:11434/api/generate";
@@ -48,7 +49,12 @@ export function validateLocalTask(task) {
   if (!TASK_ID_PATTERN.test(task.taskId ?? "")) throw new Error("Invalid local task ID");
   if (typeof task.repository !== "string" || !task.repository) throw new Error("Local task repository is required");
   if (typeof task.base !== "string" || !task.base || /[\r\n]/.test(task.base)) throw new Error("Local task base is required");
-  if (typeof task.model !== "string" || !task.model || /[\r\n]/.test(task.model)) throw new Error("Local task model is required");
+  if (task.model !== undefined && (typeof task.model !== "string" || !task.model || /[\r\n]/.test(task.model))) {
+    throw new Error("Local task model override is invalid");
+  }
+  if (task.requiredTier !== undefined && !["economy", "standard", "premium"].includes(task.requiredTier)) {
+    throw new Error("Local task requiredTier is invalid");
+  }
   assertPositiveInteger(task.timeoutMinutes, "timeoutMinutes", 30);
   assertPositiveInteger(task.maxOutputTokens, "maxOutputTokens", 16_384);
   assertPositiveInteger(task.maxContextBytes, "maxContextBytes", 1_000_000);
@@ -319,6 +325,20 @@ export async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
   const taskFile = path.resolve(options.taskFile);
   const task = validateLocalTask(JSON.parse(readFileSync(taskFile, "utf8")));
+  const config = JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8"));
+  const ollama = await discoverOllama();
+  const candidates = discoverCandidatePool({ config, ollama }).filter((candidate) => candidate.provider === "ollama");
+  const qualificationPath = path.join(ROOT, ".codex-factory", "qualifications.jsonl");
+  const qualifications = existsSync(qualificationPath)
+    ? readFileSync(qualificationPath, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line))
+    : [];
+  const selected = selectCandidate({
+    candidates: task.model ? candidates.filter((candidate) => candidate.model === task.model) : candidates,
+    qualifications,
+    role: "structured_write",
+    requiredTier: task.requiredTier ?? "standard",
+  });
+  task.model = selected.model;
   const repository = assertGitRoot(path.resolve(task.repository));
   const stateRoot = path.resolve(ROOT, ".codex-factory", "local-patch");
   const ledgerPath = path.resolve(stateRoot, "ledger.jsonl");
@@ -335,6 +355,7 @@ export async function main(argv = process.argv.slice(2)) {
     maxOutputTokens: task.maxOutputTokens,
     maxContextBytes: task.maxContextBytes,
     tokenAccounting: "telemetry-only",
+    selectionFactors: selected.factors,
     execute: options.execute,
   };
   if (!options.execute) {

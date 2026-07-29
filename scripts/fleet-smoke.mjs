@@ -37,8 +37,8 @@ ${PACKAGE_SOURCE}`,
     prompt: `You are one read-only leaf worker in a two-worker smoke test.
 Do not delegate, call tools, edit files, or discuss your process.
 Use the supplied factory.config.json source below.
-Return exactly one raw JSON object with keys task, maxConcurrentWorkers, and localModel.
-Set task to "config". Read maxConcurrentWorkers from budgets and localModel from routes.local-read.model.
+Return exactly one raw JSON object with keys task, maxConcurrentWorkers, discoverOllama, and configuredCodexCandidates.
+Set task to "config". Read maxConcurrentWorkers from budgets, discoverOllama from candidates.ollama.discover, and configuredCodexCandidates as the length of candidates.openai.
 Do not use Markdown fences or add any other text.
 
 factory.config.json:
@@ -65,7 +65,8 @@ export function validateSmokeArtifact(taskId, text) {
     if (
       artifact.task !== "config"
       || artifact.maxConcurrentWorkers !== CONFIG.budgets.maxConcurrentWorkers
-      || artifact.localModel !== CONFIG.routes["local-read"].model
+      || artifact.discoverOllama !== CONFIG.candidates.ollama.discover
+      || artifact.configuredCodexCandidates !== CONFIG.candidates.openai.length
     ) {
       throw new Error("Config artifact mismatch");
     }

@@ -3,9 +3,9 @@
 **Give AI workers a shift, not a blank check.**
 
 Codex Factory is an experimental local supervisor for bounded Codex and Ollama
-software workers. It routes one task to an explicit model and sandbox, records a
-durable reservation for metered routes, owns the child process tree, and retains
-the request, events, result, and terminal usage as evidence.
+software workers. It discovers candidates, admits only models with a current
+exact-role qualification, prefers qualified free local capacity, owns the child
+process tree, and retains selection and execution evidence.
 
 [Website](https://scottconverse.github.io/codex-factory/) ·
 [User manual](docs/USER-MANUAL.md) ·
@@ -15,7 +15,10 @@ the request, events, result, and terminal usage as evidence.
 
 ## What 0.1.0 includes
 
-- explicit Sol, Terra, Luna, and Ollama routes;
+- discovery of every installed Ollama model plus configured Sol, Terra, and Luna candidates;
+- fingerprinted analysis, structured-reasoning benchmark, structured-write,
+  and workspace-write qualification;
+- automatic selection from the currently qualified pool;
 - dry-run by default and one worker at a time;
 - single-use task IDs and no automatic retries;
 - lock-scoped aggregate budget admission and durable reservations;
@@ -28,13 +31,14 @@ the request, events, result, and terminal usage as evidence.
 
 ## Quick start
 
-Requirements: Node.js 24+, Git, and Codex CLI. Ollama is required only for the
-included local route.
+Requirements: Node.js 24+, Git, and Codex CLI. Ollama is required for local
+candidate discovery and qualification.
 
 ```powershell
 git clone https://github.com/scottconverse/codex-factory.git
 cd codex-factory
 npm.cmd run check
+npm.cmd run fleet:qualify
 
 node scripts/run-worker.mjs `
   --task-id inspect-repo `
@@ -43,7 +47,12 @@ node scripts/run-worker.mjs `
   --prompt-file examples/inventory.prompt.md
 ```
 
-The command is a dry run. It prints the model, provider, reasoning effort,
+`fleet:qualify` previews every applicable candidate/harness pair without model
+inference. Add `--execute` to qualify free local candidates; paid Codex
+candidates additionally require `--include-paid`.
+
+The worker command is also a dry run. It prints the selected currently qualified
+model, provider, reasoning effort,
 sandbox, applicable token policy, timeout, and exact CLI arguments with
 `"execute": false`. Add `--execute` only after the preview matches the intended
 task.
@@ -84,11 +93,10 @@ The preview server uses `http://127.0.0.1:4173` by default. Set
 Version 0.1.0 is an evidence-producing prototype for controlled delegation
 experiments. It is not a campaign engine, parallel scheduler, PM control room,
 automatic merge system, semantic verifier, or hard real-time spend controller.
-Read-only delegation has narrow qualification evidence. `gemma4:12b` is also
-qualified for the constrained structured-file local patch path; autonomous
-local tool use and writable Codex subprocess workers remain unqualified.
-Routes remain explicit operator choices. DevHarmonics, not this prototype,
-already contains the adaptive qualification and selection control plane.
+Candidate availability is discovered rather than hardcoded. Qualification is
+role scoped: a model may qualify for analysis and fail structured writes without
+being removed from the fleet. The current host must qualify its exact runtime
+fingerprints before routing begins.
 
 ## Project documents
 

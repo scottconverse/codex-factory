@@ -13,6 +13,7 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -39,9 +40,22 @@ export function validateConfig(config) {
   for (const key of ["aggregatePaidTokens", "maxWorkerMinutes", "maxAttemptsPerTask", "maxConcurrentWorkers"]) {
     if (!Number.isSafeInteger(config.budgets?.[key]) || config.budgets[key] <= 0) throw new Error(`Invalid budget: ${key}`);
   }
+  if ("qualificationMinutes" in config.budgets && (!Number.isSafeInteger(config.budgets.qualificationMinutes) || config.budgets.qualificationMinutes <= 0)) {
+    throw new Error("Invalid budget: qualificationMinutes");
+  }
   if (config.budgets.maxAttemptsPerTask !== 1) throw new Error("Initial factory permits exactly one attempt per task");
   if (config.budgets.maxConcurrentWorkers !== 1) throw new Error("Initial factory permits exactly one worker at a time");
   for (const [name, route] of Object.entries(config.routes ?? {})) {
+    if (!route.provider) {
+      if (!["analysis", "structured_write", "workspace_write"].includes(route.qualificationRole)) {
+        throw new Error(`Route ${name} has an unsupported qualification role`);
+      }
+      if (!["economy", "standard", "premium"].includes(route.requiredTier)) {
+        throw new Error(`Route ${name} has an unsupported required tier`);
+      }
+      if (!["read-only", "workspace-write"].includes(route.sandbox)) throw new Error(`Route ${name} has an unsupported sandbox`);
+      continue;
+    }
     if (!["openai", "ollama"].includes(route.provider)) throw new Error(`Route ${name} has an unsupported provider`);
     if (!route.model) throw new Error(`Route ${name} is incomplete`);
     if (!["low", "medium", "high", "xhigh"].includes(route.reasoningEffort)) throw new Error(`Route ${name} has an unsupported reasoning effort`);
@@ -55,7 +69,25 @@ export function validateConfig(config) {
       throw new Error(`Local route ${name} must not declare a token reservation`);
     }
   }
+  for (const candidate of config.candidates?.openai ?? []) {
+    if (typeof candidate.model !== "string" || !candidate.model) throw new Error("Configured Codex candidate requires a model");
+    if (!["economy", "standard", "premium"].includes(candidate.tier)) throw new Error(`Unsupported candidate tier: ${candidate.tier}`);
+    if (!["low", "medium", "high", "xhigh"].includes(candidate.reasoningEffort)) throw new Error(`Unsupported reasoning effort for ${candidate.model}`);
+    if (!Number.isSafeInteger(candidate.tokenReservation) || candidate.tokenReservation <= 0) throw new Error(`Paid candidate ${candidate.model} needs a token reservation`);
+  }
   return config;
+}
+
+export function resolveRouteCandidate({ config, role, candidates, qualifications }) {
+  const requirement = config.routes?.[role];
+  if (!requirement) throw new Error(`Unknown role: ${role}`);
+  const selected = selectCandidate({
+    candidates,
+    qualifications,
+    role: requirement.qualificationRole,
+    requiredTier: requirement.requiredTier,
+  });
+  return { ...selected, sandbox: requirement.sandbox };
 }
 
 export function buildInvocation({ route, cwd, outputPath }) {
@@ -116,6 +148,11 @@ export function classifyResult({ processResult, executionError, usage, finalMess
 
 function usageSpent(ledgerPath, paid) {
   return existsSync(ledgerPath) ? summarizeLedger(readFileSync(ledgerPath, "utf8"), paid) : 0;
+}
+
+function readJsonLines(filename) {
+  if (!existsSync(filename)) return [];
+  return readFileSync(filename, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
 export function taskWasAttempted(ledgerPath, taskId) {
@@ -203,8 +240,10 @@ export async function main(argv = process.argv.slice(2)) {
   if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(options.taskId)) throw new Error("Task ID must use lowercase letters, digits, underscores, or hyphens");
   const configPath = path.resolve(options.config ?? path.join(ROOT, "factory.config.json"));
   const config = validateConfig(JSON.parse(readFileSync(configPath, "utf8")));
-  const route = config.routes[options.role];
-  if (!route) throw new Error(`Unknown role: ${options.role}`);
+  const ollama = await discoverOllama().catch(() => ({ runtimeVersion: "unavailable", models: [] }));
+  const candidates = discoverCandidatePool({ config, ollama });
+  const qualifications = readJsonLines(path.join(ROOT, ".codex-factory", "qualifications.jsonl"));
+  const route = resolveRouteCandidate({ config, role: options.role, candidates, qualifications });
   const cwd = path.resolve(options.cwd);
   const promptPath = path.resolve(options.promptFile);
   assertGitRepository(cwd);

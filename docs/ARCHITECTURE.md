@@ -64,10 +64,12 @@ and owns the launched process tree.
 declared file contents and returns complete text for allowlisted files. It
 cannot select commands or filesystem paths outside the task contract.
 
-Model discovery, qualification, adaptive selection, and fleet scheduling are
-deliberately outside this prototype. DevHarmonics already implements those
-control-plane responsibilities; duplicating them here would create two policy
-engines with different evidence.
+`scripts/factory-fleet.mjs` ports the proven DevHarmonics candidate pattern:
+runtime discovery, exact model/runtime/harness fingerprints, role-scoped
+qualification, a structured-reasoning benchmark for mutating work, capability
+admission, tier fit, and free-local-first selection.
+`scripts/qualify-fleet.mjs` exercises every worker-capable discovered candidate;
+embedding-only inventory remains visible but is not treated as a subagent.
 
 ### Durable local state
 
@@ -111,5 +113,4 @@ The system fails closed where evidence is missing:
 - semantic acceptance verification;
 - remote control plane or web application;
 - MCP server;
-- model qualification registry;
 - cross-provider performance history.

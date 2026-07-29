@@ -84,14 +84,14 @@ declared test, and commit `c2ae0d0ff2fb027b44d05b94c6556520aab6a5f8`.
 Removing the edge-hyphen cleanup made the same test fail, proving the check was
 sensitive to the required behavior.
 
-## 2026-07-29 — Do not duplicate DevHarmonics routing
+## 2026-07-29 — Port the proven DevHarmonics worker-selection core
 
 DevHarmonics already implements model discovery, exact-role qualification,
 capability and permission admission, adaptive scoring, cheapest-at-established-
 parity selection, health/quota fallback, and bounded local file tools.
 
-Codex Factory therefore remains a thin execution and receipt adapter plus a
-small experiment harness. Its routes are explicit operator choices, not an
-independent adaptive scheduler. If the products are joined, DevHarmonics owns
-selection and Codex Factory supplies only execution receipts for a selected
-worker surface.
+Codex Factory copies and adapts the useful independent pieces rather than
+depending on DevHarmonics: runtime discovery, capability admission, exact
+model/runtime/harness fingerprints, role-scoped qualification, tier fit, and
+qualified free-local-first selection. It does not copy the DevHarmonics
+database, campaigns, product model, server, UI, or delivery machinery.

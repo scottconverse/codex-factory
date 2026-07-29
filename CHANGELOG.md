@@ -6,6 +6,10 @@ All notable changes to Codex Factory are documented here.
 
 ### Added
 
+- Dynamic discovery of every installed Ollama model and configured Codex
+  candidate.
+- Exact-runtime, exact-harness, role-scoped candidate qualification and
+  automatic selection from the passing pool.
 - Experimental two-worker concurrency smoke harness with explicit Ollama and
   OpenAI routes.
 - Evidence-backed preferred worker ladder led by `qwen3.5:9b`, then Luna and
@@ -17,8 +21,8 @@ All notable changes to Codex Factory are documented here.
 
 ### Changed
 
-- The default local route is `gemma4:12b`, qualified for the constrained
-  structured-file patch contract. `qwen3.5:9b` remains read-only only.
+- Fixed model routes became role/tier policies. Current qualification evidence,
+  not a hardcoded ladder, decides which candidate runs.
 
 ## [0.1.0] - 2026-07-29
 

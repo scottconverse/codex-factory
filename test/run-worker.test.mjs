@@ -3,8 +3,9 @@ import test from "node:test";
 import { rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildInvocation, classifyResult, parseArgs, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
+import { buildInvocation, classifyResult, parseArgs, resolveRouteCandidate, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
 import { buildSmokeInvocation, validateSmokeArtifact, workersOverlap } from "../scripts/fleet-smoke.mjs";
+import { candidateFingerprint, discoverCandidatePool } from "../scripts/factory-fleet.mjs";
 
 test("parseArgs keeps execution opt-in", () => {
   assert.deepEqual(parseArgs(["--task-id", "one", "--role", "mechanical"]), { taskId: "one", role: "mechanical", execute: false });
@@ -68,6 +69,33 @@ test("buildInvocation pins provider, model, reasoning, sandbox, and ephemeral JS
   assert.ok(invocation.args.includes("read-only"));
 });
 
+test("route resolution selects from all currently qualified candidates instead of a fixed model", () => {
+  const config = {
+    routes: {
+      mechanical: { qualificationRole: "analysis", requiredTier: "economy", sandbox: "read-only" },
+    },
+  };
+  const candidates = discoverCandidatePool({
+    config: {
+      candidates: {
+        openai: [{ model: "gpt-5.6-luna", tier: "economy", reasoningEffort: "low", paid: true, tokenReservation: 20_000 }],
+      },
+    },
+    ollama: { runtimeVersion: "0.11.4", models: ["qwen3.5:9b"] },
+  });
+  const local = candidates[0];
+  const paid = candidates[1];
+  const qualifications = [
+    { candidateId: local.id, role: "analysis", fingerprint: candidateFingerprint(local, "analysis"), passed: true },
+    { candidateId: paid.id, role: "analysis", fingerprint: candidateFingerprint(paid, "analysis"), passed: true },
+  ];
+  const route = resolveRouteCandidate({ config, role: "mechanical", candidates, qualifications });
+  assert.deepEqual(
+    { provider: route.provider, model: route.model, sandbox: route.sandbox, paid: route.paid },
+    { provider: "ollama", model: "qwen3.5:9b", sandbox: "read-only", paid: false },
+  );
+});
+
 test("summarizeUsage rejects missing receipts and counts input plus output once", () => {
   assert.equal(summarizeUsage('{"type":"turn.started"}\n'), null);
   assert.deepEqual(
@@ -127,8 +155,8 @@ test("fleet smoke validates independently observed repository facts", () => {
     { task: "package", name: "codex-factory", version: "0.1.0" },
   );
   assert.deepEqual(
-    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"localModel":"qwen3.5:9b"}'),
-    { task: "config", maxConcurrentWorkers: 1, localModel: "qwen3.5:9b" },
+    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"discoverOllama":true,"configuredCodexCandidates":3}'),
+    { task: "config", maxConcurrentWorkers: 1, discoverOllama: true, configuredCodexCandidates: 3 },
   );
   assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.0"}'), /Package artifact mismatch/);
 });
