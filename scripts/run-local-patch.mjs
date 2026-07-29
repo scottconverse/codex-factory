@@ -30,7 +30,8 @@ function assertPositiveInteger(value, label, maximum) {
 }
 
 function normalizeRepositoryPath(value) {
-  if (typeof value !== "string" || !value || path.isAbsolute(value)) {
+  const windowsAbsolute = typeof value === "string" && (/^[A-Za-z]:[\\/]/.test(value) || /^\\\\/.test(value));
+  if (typeof value !== "string" || !value || path.isAbsolute(value) || windowsAbsolute) {
     throw new Error(`Expected a relative repository path: ${value}`);
   }
   const normalized = value.replaceAll("\\", "/");
