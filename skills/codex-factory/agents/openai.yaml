@@ -1,0 +1,4 @@
+interface:
+  display_name: "Codex Factory"
+  short_description: "Route bounded work across Codex and local models"
+  default_prompt: "Use $codex-factory to run a budgeted boss-and-worker software task."

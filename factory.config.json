@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "budgets": {
+    "aggregatePaidTokens": 250000,
+    "aggregateLocalTokens": 1000000,
+    "maxWorkerMinutes": 30,
+    "maxAttemptsPerTask": 1,
+    "maxConcurrentWorkers": 1
+  },
+  "routes": {
+    "mechanical": {
+      "provider": "openai",
+      "model": "gpt-5.6-luna",
+      "reasoningEffort": "low",
+      "tokenReservation": 20000,
+      "sandbox": "read-only",
+      "paid": true
+    },
+    "standard": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "reasoningEffort": "medium",
+      "tokenReservation": 40000,
+      "sandbox": "workspace-write",
+      "paid": true
+    },
+    "review": {
+      "provider": "openai",
+      "model": "gpt-5.6-terra",
+      "reasoningEffort": "high",
+      "tokenReservation": 35000,
+      "sandbox": "read-only",
+      "paid": true
+    },
+    "critical": {
+      "provider": "openai",
+      "model": "gpt-5.6-sol",
+      "reasoningEffort": "high",
+      "tokenReservation": 60000,
+      "sandbox": "workspace-write",
+      "paid": true
+    },
+    "local-read": {
+      "provider": "ollama",
+      "model": "qwen3.5:4b",
+      "reasoningEffort": "low",
+      "tokenReservation": 60000,
+      "sandbox": "read-only",
+      "paid": false
+    }
+  }
+}

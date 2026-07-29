@@ -1,0 +1,3 @@
+.codex-factory/
+node_modules/
+*.log

@@ -1,0 +1,22 @@
+{
+  "name": "codex-factory",
+  "version": "0.1.0",
+  "description": "Budgeted boss-and-worker orchestration for Codex and qualified local models.",
+  "author": {
+    "name": "Scott Converse"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Factory",
+    "shortDescription": "Run bounded AI software workers with receipts.",
+    "longDescription": "Codex Factory routes bounded software tasks to explicit Codex or local-model workers, enforces execution budgets, and records auditable receipts.",
+    "developerName": "Scott Converse",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "defaultPrompt": [
+      "Plan a budgeted Codex Factory run.",
+      "Run a bounded worker and show its receipt.",
+      "Compare Codex-native capability with a custom factory."
+    ]
+  }
+}

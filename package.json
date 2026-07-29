@@ -1,0 +1,14 @@
+{
+  "name": "codex-factory",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Budgeted boss-and-worker orchestration for Codex and qualified local models.",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check scripts/run-worker.mjs && node --test"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
