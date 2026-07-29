@@ -52,8 +52,11 @@ export function validateCampaign(value) {
     && (!Number.isSafeInteger(value.localAttemptMinutes) || value.localAttemptMinutes < 1 || value.localAttemptMinutes > 30)) {
     throw new Error("Campaign local attempt minutes must be between 1 and 30");
   }
-  if (typeof value.sourceFile !== "string" || !value.sourceFile) throw new Error("Campaign sourceFile is required");
-  value.sourceFile = normalizePath(value.sourceFile, "Campaign sourceFile");
+  if (Boolean(value.sourceFile) === Boolean(value.source)) throw new Error("Campaign needs exactly one of sourceFile or source");
+  if (value.sourceFile !== undefined) value.sourceFile = normalizePath(value.sourceFile, "Campaign sourceFile");
+  if (value.source !== undefined && (typeof value.source !== "string" || value.source.trim().length < 10)) {
+    throw new Error("Campaign source is incomplete");
+  }
   if (!Array.isArray(value.tasks) || value.tasks.length === 0) throw new Error("Campaign needs at least one task");
 
   const ids = new Set();

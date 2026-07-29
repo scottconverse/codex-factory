@@ -5,27 +5,46 @@ description: Discover, qualify, select, and supervise bounded software workers a
 
 # Codex Factory
 
-Keep the current agent as coordinator. Delegate only a bounded leaf task whose
-acceptance criteria and writable scope are already known.
+The current top-level Codex session is the coordinator. The owner supplies a
+prompt, specification, or plan in normal language; the coordinator owns the
+internal task plan. Never ask the owner to write Factory JSON.
 
 ## Run
 
-1. Read `references/operating-contract.md`.
-2. Run `npm.cmd run fleet:qualify` to preview the complete current candidate and
+1. Read `references/operating-contract.md`, inspect the current workspace, and
+   identify the target Git repository. If there is no target repository, select
+   a new, non-existent destination and bootstrap only that destination; never
+   convert or overwrite a nonempty owner directory. Do not intake a repository
+   with tracked owner changes: preserve them and use a clean worktree instead.
+2. Create a private coordinator intake from the owner request:
+
+   ```powershell
+   node scripts/coordinator-intake.mjs --repository <existing-repo> --prompt "<owner request>"
+   # or, for a new project:
+   node scripts/coordinator-intake.mjs --bootstrap <empty-target> --prompt "<owner request>"
+   ```
+
+   The command stores the source and a reserved internal `campaign.json` path
+   under Factory's own `.codex-factory/coordinator/` state. It is not an
+   owner-facing plan format and does not write coordinator state into the target
+   repository.
+3. Read the intake source and inspect the target repository. Decide whether the
+   request is one bounded task or benefits from decomposition. For every leaf,
+   define acceptance criteria, minimal read/write scope, one runnable check,
+   dependencies, and whether it can safely run in parallel. Keep architecture,
+   integration, acceptance, and user communication in this top-level session.
+4. Read the intake's `sourcePath`, then write the internal valid campaign plan
+   to its `planFile` with that text in the plan's `source` field. Do not
+   dispatch `critical` work through the campaign: retain it in the coordinator
+   or split it into safe bounded leaves.
+5. Run `npm.cmd run fleet:qualify` to preview the complete current candidate and
    harness plan. Execute local qualification when current evidence is absent.
-3. Select a role policy from `factory.config.json`; the runner chooses only from
-   candidates with a current exact-role qualification.
-4. Create a prompt file containing the task, acceptance criteria, allowed paths,
-   required checks, and the instruction not to delegate.
-5. Run `node scripts/run-worker.mjs ...` without `--execute`.
-6. Inspect the printed model, provider, sandbox, reservation, timeout, and
-   remaining aggregate budget.
-7. Add `--execute` only when the dry run matches the approved task.
-8. For multi-task work, use `node scripts/run-campaign.mjs --plan-file <plan>`
-   first. Keep only non-overlapping independent tasks parallel; it routes local
-   first, then Luna, then Terra, and leaves an integration branch for review.
-9. Treat `.codex-factory/runs/<run>/result.json` or the campaign result as the
-   receipt. Obtain a fresh-context adversarial audit before accepting code.
+6. Run `node scripts/run-campaign.mjs --plan-file <internal-plan>` without
+   `--execute`, inspect its selected local/Luna/Terra ladder, then add
+   `--execute` only after the dry run matches the bounded plan.
+7. Treat the campaign result as the worker receipt. Integrate only accepted
+   commits, run the coordinator's acceptance checks, and obtain a fresh-context
+   adversarial audit before accepting code.
 
 For a qualified constrained local write, use
 `node scripts/run-local-patch.mjs --task-file <task.json>` for preview and add

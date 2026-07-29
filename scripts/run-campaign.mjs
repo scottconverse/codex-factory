@@ -309,8 +309,8 @@ export async function main(argv = process.argv.slice(2)) {
   const planPath = path.resolve(options.planFile);
   const plan = validateCampaign(JSON.parse(readFileSync(planPath, "utf8")));
   const repository = gitRoot(path.resolve(plan.repository));
-  const sourcePath = resolveCampaignSource(repository, plan.sourceFile);
-  const source = readFileSync(sourcePath, "utf8");
+  const sourcePath = plan.sourceFile ? resolveCampaignSource(repository, plan.sourceFile) : null;
+  const source = plan.source ?? readFileSync(sourcePath, "utf8");
   const config = validateConfig(JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8")));
   if (plan.maxParallel > config.budgets.maxConcurrentWorkers) {
     throw new Error(`Campaign maxParallel exceeds configured worker slots (${config.budgets.maxConcurrentWorkers})`);

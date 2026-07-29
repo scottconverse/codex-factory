@@ -19,7 +19,9 @@ process tree, and retains selection and execution evidence.
 - fingerprinted analysis, structured-reasoning benchmark, structured-write,
   and workspace-write qualification;
 - automatic selection from the currently qualified pool;
-- a campaign coordinator that accepts a prompt/specification plus a dependency plan;
+- a primary-Codex coordinator flow that accepts an owner prompt/specification,
+  discovers an existing repository or safely bootstraps an empty one, then
+  creates its dependency plan internally;
 - dry-run by default, with up to four explicitly declared non-overlapping workers;
 - one qualified local attempt first, then explicit Luna and Terra fallbacks;
 - single-use task IDs and no automatic retries;
@@ -62,23 +64,38 @@ task.
 See the [user manual](docs/USER-MANUAL.md) for task contracts, route details,
 execution, receipts, recovery, and troubleshooting.
 
-## Coordinate a campaign
+## Coordinate from a prompt
 
-Put the owner prompt or specification beside a small campaign plan. The included
-example is safe by default: it only previews selection and scheduling.
+Use the Codex Factory skill in the top-level Codex session and give it the
+owner request in normal language. That session is the coordinator: it inspects
+the repository, decides whether decomposition helps, writes its internal plan,
+and keeps integration and acceptance in the primary context. The owner does
+not write a campaign JSON file. The target must have no tracked uncommitted
+changes; Factory preserves owner work rather than incorporating it into a
+campaign base.
+
+For the underlying coordinator intake, provide an existing repository:
 
 ```powershell
-node scripts/run-campaign.mjs --plan-file examples/campaign-plan.json
+node scripts/coordinator-intake.mjs --repository C:\work\my-project --prompt "Add a health-check endpoint with tests."
 ```
 
-The plan has named tasks, exact read/write paths, dependencies, checks, and a
-`parallelSafe` declaration. Tasks may share a batch only when their paths do
-not overlap in either direction. The coordinator first dispatches one current
-qualified local model for each task. A fast local failure falls back to
-`gpt-5.6-luna`, then `gpt-5.6-terra`, when those exact routes are currently
-qualified and admitted by the paid ledger. Add `--execute` only after reviewing
-the preview; execution creates an isolated integration worktree and never
-merges it into your branch automatically.
+Or bootstrap a genuinely new project at an exact new path:
+
+```powershell
+node scripts/coordinator-intake.mjs --bootstrap C:\work\new-project --prompt "Build a small command-line timer."
+```
+
+The intake produces a private source and a reserved internal plan path below
+Factory's `.codex-factory/coordinator/` state, without writing coordinator
+state into the target repository. The coordinator carries the source text in
+its internal plan, then previews
+and executes `run-campaign`. Tasks can share a batch only when their paths do
+not overlap in either direction. Each task first uses one qualified local model;
+a fast local failure falls back to `gpt-5.6-luna`, then `gpt-5.6-terra`, when
+those exact routes are currently qualified and admitted by the paid ledger.
+Execution creates an isolated integration worktree and never merges it into the
+owner branch automatically.
 
 ## Important boundary
 

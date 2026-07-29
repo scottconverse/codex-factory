@@ -24,6 +24,7 @@ language model into a trusted autonomous developer.
 
 - Windows, macOS, or Linux with Node.js 24 or newer
 - Git
+- a Git worktree with no tracked uncommitted owner changes
 - Codex CLI available as `codex` (`codex.exe` on Windows)
 - A Git repository for the worker's target directory
 - Ollama for local-model discovery and qualification
@@ -48,15 +49,41 @@ it automatically into a personal marketplace; operate it from the checkout.
 
 ## Campaign coordination
 
-`scripts/run-campaign.mjs` is the owner-facing coordinator. It reads a source
-prompt/specification and a JSON plan of bounded leaf tasks. Start with the
-included dry-run example:
+The top-level Codex session using the Factory skill is the owner-facing
+coordinator. The owner supplies a prompt, specification, or plan in normal
+language. The coordinator inspects the target repository, decides whether to
+decompose, and writes the JSON campaign plan privately; the owner never needs
+to create that JSON.
+
+First create the internal intake for an existing repository:
 
 ```powershell
-node scripts/run-campaign.mjs --plan-file examples/campaign-plan.json
+node scripts/coordinator-intake.mjs --repository C:\work\my-project --prompt "Add a health-check endpoint with tests."
 ```
 
-Each task declares `readPaths`, `writePaths`, dependencies, one check, and
+When there is no repository, the coordinator may bootstrap one only at an
+explicit new target path that does not already exist:
+
+```powershell
+node scripts/coordinator-intake.mjs --bootstrap C:\work\new-project --prompt "Build a small command-line timer."
+```
+
+Bootstrap refuses every pre-existing target and records a clearly authored initial Git
+commit so that isolated worker worktrees have a base. The intake copies the
+owner source and reserves the coordinator's internal plan path under
+Factory's `.codex-factory/coordinator/` state; it does not execute a worker or
+write coordinator state into the target repository. The coordinator copies the
+private source text into its internal plan rather than passing the owner a JSON
+format.
+
+Intake rejects tracked uncommitted changes. It does not stash, reset, or
+silently include owner work in the campaign's `HEAD` base; preserve that work
+and use a clean worktree for the campaign.
+
+The coordinator then writes the plan and runs `scripts/run-campaign.mjs` in
+dry-run mode before adding `--execute`.
+
+Each internal task declares `readPaths`, `writePaths`, dependencies, one check, and
 `parallelSafe`. The plan rejects undeclared parallel read/write or write/write
 overlap, so only genuinely independent work shares a wave. Each task uses one
 current qualified local attempt with a short wall-clock limit. On failure, the

@@ -59,6 +59,9 @@ function campaign(overrides = {}) {
 
 test("validateCampaign accepts a bounded dependency plan and rejects overlapping parallel access", () => {
   assert.equal(validateCampaign(campaign()).campaignId, "ship-widget");
+  const inlineSource = campaign({ sourceFile: undefined, source: "Implement the supplied owner request without expanding its scope." });
+  assert.equal(validateCampaign(inlineSource).source.startsWith("Implement"), true);
+  assert.throws(() => validateCampaign(campaign({ source: "duplicate source" })), /exactly one/i);
   const invalid = campaign();
   invalid.tasks[1].writePaths = ["src/api.mjs"];
   assert.throws(() => validateCampaign(invalid), /parallel tasks .* overlap/i);

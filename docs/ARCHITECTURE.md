@@ -9,9 +9,16 @@ local-model support instead of implementing a second agent runtime.
 ## Runtime flow
 
 ```text
-Coordinator
+Owner prompt/specification
     |
-    | task ID + role + repository + prompt
+    v
+Primary Codex coordinator
+    |-- inspect existing repository or bootstrap an explicit empty target
+    |-- produce private bounded dependency plan
+    v
+Campaign runner
+    |
+    | task ID + role + repository + internal source
     v
 Runner preflight
     |-- validate configuration and prompt contract
@@ -56,11 +63,19 @@ Provider/accounting mismatches are rejected.
 
 ### Campaign coordinator and supervisor
 
-`scripts/run-campaign.mjs` reads a campaign source and validated dependency
-plan, dispatches only independent non-overlapping tasks, and integrates accepted
-commits into an isolated branch. Its ladder is one qualified Ollama attempt,
-then explicit Luna, then Terra. It retains the integration result for owner
-inspection and never auto-merges the owner branch.
+`scripts/coordinator-intake.mjs` is the boundary between an owner request and
+the internal campaign format. It copies the request into Factory-owned ignored
+local state, reserves a plan path, and either validates an existing Git
+repository or safely bootstraps an explicit empty target. It never writes
+coordinator state into the target repository, plans, routes, or launches a
+worker itself.
+
+The primary Codex session reads that intake, inspects the repository, chooses
+whether decomposition is useful, and creates the validated dependency plan.
+`scripts/run-campaign.mjs` then dispatches only independent non-overlapping
+tasks and integrates accepted commits into an isolated branch. Its ladder is
+one qualified Ollama attempt, then explicit Luna, then Terra. It retains the
+integration result for owner inspection and never auto-merges the owner branch.
 
 `scripts/run-worker.mjs` is a dependency-free Node.js process supervisor. It
 constructs an explicit `codex exec` invocation, sends the prompt through stdin,
@@ -106,6 +121,8 @@ a Codex skill. Version 0.1.1 does not install the skill automatically.
 The system fails closed where evidence is missing:
 
 - an invalid task contract prevents launch;
+- tracked owner changes prevent coordinator intake, so an isolated campaign
+  cannot silently omit or overwrite uncommitted work;
 - all live worker slots prevent launch;
 - a reused task ID prevents launch;
 - insufficient aggregate budget prevents launch;
