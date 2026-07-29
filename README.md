@@ -112,4 +112,5 @@ fingerprints before routing begins.
 - [Contributing](CONTRIBUTING.md)
 - [License](LICENSE)
 
-Copyright © 2026 Scott Converse. All rights reserved.
+Copyright © 2026 Scott Converse. Licensed under the
+[Apache License 2.0](LICENSE).

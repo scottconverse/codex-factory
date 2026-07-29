@@ -39,7 +39,6 @@ Live model execution is never required for documentation-only contributions.
 
 ## Licensing
 
-The current release is all rights reserved. Opening an issue or pull request
-does not grant a license to the project or guarantee that a contribution will be
-accepted. A separate contributor and project license policy may be adopted in a
-future release.
+Codex Factory is licensed under the [Apache License 2.0](LICENSE). Unless you
+explicitly state otherwise, contributions intentionally submitted for inclusion
+in the project are provided under the same license, as described in Section 5.
