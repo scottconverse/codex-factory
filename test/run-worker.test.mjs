@@ -14,7 +14,7 @@ test("parseArgs keeps execution opt-in", () => {
 test("validateConfig rejects concurrency and retry expansion", () => {
   const base = {
     version: 1,
-    budgets: { aggregatePaidTokens: 1, aggregateLocalTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 2, maxConcurrentWorkers: 1 },
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 2, maxConcurrentWorkers: 1 },
     routes: {},
   };
   assert.throws(() => validateConfig(base), /exactly one attempt/);
@@ -26,7 +26,7 @@ test("validateConfig rejects concurrency and retry expansion", () => {
 test("validateConfig rejects unaccounted providers and invalid reasoning effort", () => {
   const config = {
     version: 1,
-    budgets: { aggregatePaidTokens: 1, aggregateLocalTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 1, maxConcurrentWorkers: 1 },
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 1, maxConcurrentWorkers: 1 },
     routes: {
       review: { provider: "openai", model: "model", reasoningEffort: "high", tokenReservation: 1, sandbox: "read-only", paid: false },
     },
@@ -35,6 +35,25 @@ test("validateConfig rejects unaccounted providers and invalid reasoning effort"
   config.routes.review.paid = true;
   config.routes.review.reasoningEffort = "unbounded";
   assert.throws(() => validateConfig(config), /unsupported reasoning effort/);
+});
+
+test("validateConfig treats local tokens as telemetry rather than admission budget", () => {
+  const config = {
+    version: 1,
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 1, maxConcurrentWorkers: 1 },
+    routes: {
+      local: {
+        provider: "ollama",
+        model: "local-model",
+        reasoningEffort: "low",
+        sandbox: "read-only",
+        paid: false,
+      },
+    },
+  };
+  assert.equal(validateConfig(config), config);
+  config.routes.local.tokenReservation = 10;
+  assert.throws(() => validateConfig(config), /must not declare a token reservation/);
 });
 
 test("buildInvocation pins provider, model, reasoning, sandbox, and ephemeral JSONL", () => {
@@ -108,8 +127,8 @@ test("fleet smoke validates independently observed repository facts", () => {
     { task: "package", name: "codex-factory", version: "0.1.0" },
   );
   assert.deepEqual(
-    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"localModel":"qwen3.5:4b"}'),
-    { task: "config", maxConcurrentWorkers: 1, localModel: "qwen3.5:4b" },
+    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"localModel":"qwen3.5:9b"}'),
+    { task: "config", maxConcurrentWorkers: 1, localModel: "qwen3.5:9b" },
   );
   assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.0"}'), /Package artifact mismatch/);
 });

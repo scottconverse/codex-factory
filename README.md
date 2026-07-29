@@ -4,8 +4,8 @@
 
 Codex Factory is an experimental local supervisor for bounded Codex and Ollama
 software workers. It routes one task to an explicit model and sandbox, records a
-durable token reservation, owns the child process tree, and retains the request,
-events, result, and terminal usage as evidence.
+durable reservation for metered routes, owns the child process tree, and retains
+the request, events, result, and terminal usage as evidence.
 
 [Website](https://scottconverse.github.io/codex-factory/) ·
 [User manual](docs/USER-MANUAL.md) ·
@@ -21,6 +21,9 @@ events, result, and terminal usage as evidence.
 - lock-scoped aggregate budget admission and durable reservations;
 - wall-clock timeout, interrupt handling, and owned process-tree cleanup;
 - JSONL events, stderr, final-message, result, and usage receipts;
+- a direct-Ollama structured patch path that validates model output, writes only
+  allowlisted files in an isolated worktree, runs a declared check, and commits
+  only on green;
 - Codex plugin metadata and an operator skill.
 
 ## Quick start
@@ -41,7 +44,7 @@ node scripts/run-worker.mjs `
 ```
 
 The command is a dry run. It prints the model, provider, reasoning effort,
-sandbox, token reservation, timeout, and exact CLI arguments with
+sandbox, applicable token policy, timeout, and exact CLI arguments with
 `"execute": false`. Add `--execute` only after the preview matches the intended
 task.
 
@@ -58,6 +61,10 @@ hard runtime controls.
 `process_completed` means only that the CLI exited zero, reported usage, stayed
 within its reservation, and produced a nonempty final artifact. It is not proof
 that the task passed acceptance.
+
+Local Ollama workers do not have token-spend budgets. Their hard controls are
+wall time, concurrency, attempts, context/output safety, and process cleanup.
+Token counts are retained only as performance telemetry.
 
 ## Website development
 
@@ -77,8 +84,11 @@ The preview server uses `http://127.0.0.1:4173` by default. Set
 Version 0.1.0 is an evidence-producing prototype for controlled delegation
 experiments. It is not a campaign engine, parallel scheduler, PM control room,
 automatic merge system, semantic verifier, or hard real-time spend controller.
-Read-only delegation has narrow qualification evidence; writable Codex and local
-workers are not yet qualified on the tested host.
+Read-only delegation has narrow qualification evidence. `gemma4:12b` is also
+qualified for the constrained structured-file local patch path; autonomous
+local tool use and writable Codex subprocess workers remain unqualified.
+Routes remain explicit operator choices. DevHarmonics, not this prototype,
+already contains the adaptive qualification and selection control plane.
 
 ## Project documents
 

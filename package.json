@@ -6,7 +6,8 @@
   "description": "Budgeted boss-and-worker orchestration for Codex and qualified local models.",
   "scripts": {
     "test": "node --test",
-    "check": "node --check scripts/run-worker.mjs && node --check scripts/fleet-smoke.mjs && node --check scripts/build-site.mjs && node --check scripts/check-site.mjs && node --check scripts/check-release.mjs && node --check scripts/serve-site.mjs && node --test",
+    "check": "node --check scripts/run-worker.mjs && node --check scripts/run-local-patch.mjs && node --check scripts/fleet-smoke.mjs && node --check scripts/build-site.mjs && node --check scripts/check-site.mjs && node --check scripts/check-release.mjs && node --check scripts/serve-site.mjs && node --test",
+    "local:patch": "node scripts/run-local-patch.mjs",
     "fleet:smoke": "node scripts/fleet-smoke.mjs",
     "release:check": "node scripts/check-release.mjs",
     "site:build": "node scripts/build-site.mjs",

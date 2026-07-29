@@ -3,7 +3,8 @@
 ## Budget
 
 - 250,000 aggregate paid-model tokens.
-- 1,000,000 aggregate local-model tokens.
+- Local-model tokens are telemetry; wall time and capacity are the enforced
+  limits.
 - One worker at a time.
 - One attempt per task.
 - Thirty minutes maximum per worker.

@@ -69,3 +69,19 @@ A later disposable-worktree trial requested two concurrent writes:
 Both processes overlapped and exited, but the integrated acceptance path did
 not run because neither worker produced a candidate. This keeps the ladder
 unchanged for read-only work and leaves writable coding unqualified.
+
+## Structured local patch qualification
+
+The direct-Ollama patch path does not give the model shell or filesystem tools.
+It accepts schema-bound complete file text, validates every path, writes inside
+an isolated worktree, derives the Git diff, runs the declared check, and commits
+only on green.
+
+| Model | Result | Wall time | Token telemetry | Disposition |
+|---|---:|---:|---:|---|
+| `qwen3.5:9b` | 0/3 across JSON-diff and structured-file trials | 26.6s, 37.4s, 17.8s | 419, 582, 389 | Keep read-only: unreliable coding artifact |
+| `gemma4:12b` | 1/1 | 50.4s | 470 | Qualify for constrained structured-file patch tasks |
+
+The accepted Gemma candidate changed one allowlisted file, passed the exact
+test, and committed as `c2ae0d0ff2fb027b44d05b94c6556520aab6a5f8`.
+A deliberate edge-handling mutation made the same test fail.

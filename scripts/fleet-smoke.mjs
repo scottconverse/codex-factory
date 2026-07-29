@@ -18,6 +18,7 @@ import { summarizeUsage } from "./run-worker.mjs";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE_SOURCE = readFileSync(path.join(ROOT, "package.json"), "utf8");
 const CONFIG_SOURCE = readFileSync(path.join(ROOT, "factory.config.json"), "utf8");
+const CONFIG = JSON.parse(CONFIG_SOURCE);
 const TASKS = [
   {
     id: "package",
@@ -61,7 +62,11 @@ export function validateSmokeArtifact(taskId, text) {
     return artifact;
   }
   if (taskId === "config") {
-    if (artifact.task !== "config" || artifact.maxConcurrentWorkers !== 1 || artifact.localModel !== "qwen3.5:4b") {
+    if (
+      artifact.task !== "config"
+      || artifact.maxConcurrentWorkers !== CONFIG.budgets.maxConcurrentWorkers
+      || artifact.localModel !== CONFIG.routes["local-read"].model
+    ) {
       throw new Error("Config artifact mismatch");
     }
     return artifact;

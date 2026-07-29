@@ -62,3 +62,36 @@ acceptable workaround for routine workers.
 writable worktree trial it only announced intended steps and made no tool call,
 write, test, or commit. It therefore remains qualified only for narrow
 read-only work with embedded context.
+
+## 2026-07-29 — Price controls follow the execution tier
+
+Local Ollama inference has no aggregate or per-task token-spend budget. Bound it
+with wall time, concurrency, attempts, context/output safety, and process
+cleanup; record tokens as telemetry. Codex subscription routes use measured
+usage or quota allowances without claiming per-token billing. A future paid API
+route must use hard cost/token admission and reconciliation.
+
+## 2026-07-29 — Use structured files for local writable work
+
+Free-form unified diffs from `qwen3.5:9b` were syntactically unreliable.
+The local runner instead requests complete text for explicitly allowlisted
+paths. The supervisor owns writes, Git staging, the derived diff, tests, and
+commit creation.
+
+`gemma4:12b` passed the first bounded fixture through this contract: 345 prompt
+tokens, 125 output tokens, 50.4 seconds wall time, one changed path, a green
+declared test, and commit `c2ae0d0ff2fb027b44d05b94c6556520aab6a5f8`.
+Removing the edge-hyphen cleanup made the same test fail, proving the check was
+sensitive to the required behavior.
+
+## 2026-07-29 — Do not duplicate DevHarmonics routing
+
+DevHarmonics already implements model discovery, exact-role qualification,
+capability and permission admission, adaptive scoring, cheapest-at-established-
+parity selection, health/quota fallback, and bounded local file tools.
+
+Codex Factory therefore remains a thin execution and receipt adapter plus a
+small experiment harness. Its routes are explicit operator choices, not an
+independent adaptive scheduler. If the products are joined, DevHarmonics owns
+selection and Codex Factory supplies only execution receipts for a selected
+worker surface.

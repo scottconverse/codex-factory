@@ -1,6 +1,6 @@
 ---
 name: codex-factory
-description: Route and supervise bounded software work across explicit Codex Sol, Terra, Luna, and qualified Ollama workers with token reservations, time limits, isolated scopes, and auditable receipts. Use when asked for a boss-and-worker coding fleet, budgeted AI delegation, model-tier routing, a Codex-native factory bakeoff, or proof that delegated work stayed within its assigned model and budget.
+description: Route and supervise bounded software work across explicit Codex Sol, Terra, Luna, and qualified Ollama workers with pricing-tier controls, time limits, isolated scopes, and auditable receipts. Use when asked for a boss-and-worker coding fleet, budgeted AI delegation, model-tier routing, a Codex-native factory bakeoff, or proof that delegated work stayed within its assigned model and budget.
 ---
 
 # Codex Factory
@@ -21,9 +21,16 @@ acceptance criteria and writable scope are already known.
 7. Treat `.codex-factory/runs/<run>/result.json` as the receipt. Inspect the
    worker artifact and checks independently before integrating it.
 
-Use local routes only for read-only work until qualification evidence explicitly
-permits more. Do not retry a failed task automatically or let the coordinator
-duplicate work while the worker is running.
+For a qualified constrained local write, use
+`node scripts/run-local-patch.mjs --task-file <task.json>` for preview and add
+`--execute` only after inspection. The local task declares context paths,
+write paths, a command/argument array, wall time, context/output safety limits,
+and commit message. Only `gemma4:12b` currently has writable qualification, and
+only through this structured-file path.
+
+Do not treat local token telemetry as spend admission. Do not retry a failed
+task automatically or let the coordinator duplicate work while the worker is
+running.
 
 ## Stop
 

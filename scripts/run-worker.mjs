@@ -36,18 +36,24 @@ export function parseArgs(argv) {
 
 export function validateConfig(config) {
   if (config?.version !== 1) throw new Error("factory.config.json version must be 1");
-  for (const key of ["aggregatePaidTokens", "aggregateLocalTokens", "maxWorkerMinutes", "maxAttemptsPerTask", "maxConcurrentWorkers"]) {
+  for (const key of ["aggregatePaidTokens", "maxWorkerMinutes", "maxAttemptsPerTask", "maxConcurrentWorkers"]) {
     if (!Number.isSafeInteger(config.budgets?.[key]) || config.budgets[key] <= 0) throw new Error(`Invalid budget: ${key}`);
   }
   if (config.budgets.maxAttemptsPerTask !== 1) throw new Error("Initial factory permits exactly one attempt per task");
   if (config.budgets.maxConcurrentWorkers !== 1) throw new Error("Initial factory permits exactly one worker at a time");
   for (const [name, route] of Object.entries(config.routes ?? {})) {
     if (!["openai", "ollama"].includes(route.provider)) throw new Error(`Route ${name} has an unsupported provider`);
-    if (!route.model || !Number.isSafeInteger(route.tokenReservation) || route.tokenReservation <= 0) throw new Error(`Route ${name} is incomplete`);
+    if (!route.model) throw new Error(`Route ${name} is incomplete`);
     if (!["low", "medium", "high", "xhigh"].includes(route.reasoningEffort)) throw new Error(`Route ${name} has an unsupported reasoning effort`);
     if (!["read-only", "workspace-write"].includes(route.sandbox)) throw new Error(`Route ${name} has an unsupported sandbox`);
     if (typeof route.paid !== "boolean") throw new Error(`Route ${name} must declare whether it is paid`);
     if ((route.provider === "openai") !== route.paid) throw new Error(`Route ${name} provider and paid flag disagree`);
+    if (route.paid && (!Number.isSafeInteger(route.tokenReservation) || route.tokenReservation <= 0)) {
+      throw new Error(`Route ${name} needs a positive token reservation`);
+    }
+    if (!route.paid && "tokenReservation" in route) {
+      throw new Error(`Local route ${name} must not declare a token reservation`);
+    }
   }
   return config;
 }
@@ -209,10 +215,10 @@ export async function main(argv = process.argv.slice(2)) {
 
   const stateRoot = path.join(ROOT, ".codex-factory");
   const ledgerPath = path.join(stateRoot, "usage.jsonl");
-  const aggregateLimit = route.paid ? config.budgets.aggregatePaidTokens : config.budgets.aggregateLocalTokens;
-  const spent = usageSpent(ledgerPath, route.paid);
-  const remaining = aggregateLimit - spent;
-  if (route.tokenReservation > remaining) throw new Error(`Route reservation ${route.tokenReservation} exceeds remaining budget ${remaining}`);
+  const aggregateLimit = route.paid ? config.budgets.aggregatePaidTokens : null;
+  const spent = route.paid ? usageSpent(ledgerPath, true) : null;
+  const remaining = route.paid ? aggregateLimit - spent : null;
+  if (route.paid && route.tokenReservation > remaining) throw new Error(`Route reservation ${route.tokenReservation} exceeds remaining budget ${remaining}`);
   const previewOutput = path.join(stateRoot, "dry-run-last-message.txt");
   const invocation = buildInvocation({ route, cwd, outputPath: previewOutput });
   const preview = {
@@ -222,7 +228,8 @@ export async function main(argv = process.argv.slice(2)) {
     model: route.model,
     reasoningEffort: route.reasoningEffort,
     sandbox: route.sandbox,
-    tokenReservation: route.tokenReservation,
+    tokenReservation: route.paid ? route.tokenReservation : null,
+    tokenAccounting: route.paid ? "admission-and-reconciliation" : "telemetry-only",
     spent,
     remaining,
     timeoutMinutes: config.budgets.maxWorkerMinutes,
@@ -253,9 +260,9 @@ export async function main(argv = process.argv.slice(2)) {
     }
 
     if (taskWasAttempted(ledgerPath, options.taskId)) throw new Error(`Task ${options.taskId} already has an attempt`);
-    const lockedSpent = usageSpent(ledgerPath, route.paid);
-    const lockedRemaining = aggregateLimit - lockedSpent;
-    if (route.tokenReservation > lockedRemaining) {
+    const lockedSpent = route.paid ? usageSpent(ledgerPath, true) : null;
+    const lockedRemaining = route.paid ? aggregateLimit - lockedSpent : null;
+    if (route.paid && route.tokenReservation > lockedRemaining) {
       throw new Error(`Route reservation ${route.tokenReservation} exceeds remaining budget ${lockedRemaining}`);
     }
     const executionPreview = { ...preview, spent: lockedSpent, remaining: lockedRemaining };
@@ -279,7 +286,7 @@ export async function main(argv = process.argv.slice(2)) {
       provider: route.provider,
       model: route.model,
       paid: route.paid,
-      reservedTokens: route.tokenReservation,
+      reservedTokens: route.paid ? route.tokenReservation : null,
       startedAt: startedAt.toISOString(),
     })}\n`);
 
@@ -307,7 +314,7 @@ export async function main(argv = process.argv.slice(2)) {
       executionError,
       usage,
       finalMessage,
-      tokenReservation: route.tokenReservation,
+      tokenReservation: route.paid ? route.tokenReservation : Number.MAX_SAFE_INTEGER,
     });
     const result = {
       runId,

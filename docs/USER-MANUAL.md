@@ -10,6 +10,11 @@ Ollama route, reviews a dry run, and then starts one supervised `codex exec`
 process. The runner records the selected model, permissions, timing, process
 result, final message, and terminal usage.
 
+For constrained local writes, a separate direct-Ollama runner asks the model
+for complete text for allowlisted files. The supervisor—not the model—creates
+the worktree, writes files, derives the Git diff, runs the declared check, and
+commits only on green.
+
 The supervisor is designed to make delegation inspectable. It does not replace
 the coordinator, verify a task's acceptance criteria automatically, or turn a
 language model into a trusted autonomous developer.
@@ -63,7 +68,7 @@ make product decisions.
 | `standard` | OpenAI | `gpt-5.6-terra` | medium | workspace-write | 40,000 |
 | `review` | OpenAI | `gpt-5.6-terra` | high | read-only | 35,000 |
 | `critical` | OpenAI | `gpt-5.6-sol` | high | workspace-write | 60,000 |
-| `local-read` | Ollama | `qwen3.5:4b` | low | read-only | 60,000 |
+| `local-read` | Ollama | `gemma4:12b` | low | read-only | telemetry only |
 
 These are editable local defaults, not compatibility guarantees. Validate model
 availability before execution.
@@ -139,6 +144,45 @@ node scripts/run-worker.mjs `
 Task IDs are single-use after reservation. The runner does not retry
 automatically.
 
+## Run a constrained local patch
+
+Create a task JSON with a Git root, exact context and write paths, a
+command/argument array, and operational safety limits:
+
+```json
+{
+  "version": 1,
+  "taskId": "implement-slugify",
+  "repository": "C:\\absolute\\path\\to\\repo",
+  "base": "HEAD",
+  "model": "gemma4:12b",
+  "timeoutMinutes": 3,
+  "maxOutputTokens": 2048,
+  "maxContextBytes": 65536,
+  "instructions": "Implement and export slugify from the supplied test.",
+  "readPaths": ["package.json", "test/slugify.test.mjs"],
+  "writePaths": ["src/slugify.mjs"],
+  "check": {
+    "command": "node.exe",
+    "args": ["--test", "test/slugify.test.mjs"]
+  },
+  "commitMessage": "feat: implement slugify"
+}
+```
+
+Preview, then execute explicitly:
+
+```powershell
+npm.cmd run local:patch -- --task-file C:\path\to\task.json
+npm.cmd run local:patch -- --task-file C:\path\to\task.json --execute
+```
+
+The model receives only declared file contents and has no tools. Generated
+paths must match `writePaths`. Traversal, unsafe Windows path characters,
+duplicate paths, binary content, linked write paths, and unstaged path drift
+are rejected. Raw evidence and the generated worktree remain under
+`.codex-factory/local-patch/`.
+
 ## Understand results
 
 Each run writes `.codex-factory/runs/<run-id>/`:
@@ -171,7 +215,6 @@ inspect the artifact and run the required checks.
 The initial configuration permits:
 
 - 250,000 aggregate paid tokens;
-- 1,000,000 aggregate local tokens;
 - one worker at a time;
 - one attempt per task;
 - 30 minutes per worker.
@@ -184,6 +227,11 @@ Codex currently reports token usage after the turn. Therefore the runner can
 reject an unsafe launch and reject an over-budget result, but it cannot
 interrupt a single model turn at an exact token count. The wall-clock timer and
 owned process tree are the hard runtime controls in 0.1.0.
+
+Local Ollama inference has no token-spend ceiling. It is bounded by wall time,
+concurrency, attempts, and context/output safety. Prompt and output token counts
+are recorded only as performance telemetry. Codex subscription usage allowances
+and any future paid API cost budget are separate accounting classes.
 
 ## Process recovery
 
@@ -206,10 +254,12 @@ processes.
 
 Edit `factory.config.json` deliberately. Validation requires:
 
-- positive integer aggregate and route budgets;
+- a positive aggregate allowance for metered OpenAI/Codex routes;
 - exactly one attempt and one concurrent worker in 0.1.0;
 - known providers, sandboxes, and reasoning efforts;
-- `paid: true` for OpenAI and `paid: false` for Ollama.
+- `paid: true` for the legacy metered OpenAI routes and `paid: false` for
+  token-unbudgeted Ollama routes;
+- no token reservation on a local route.
 
 Adding concurrency, retries, writable local routes, or a new provider changes
 the safety model and requires new tests and design evidence.
@@ -245,5 +295,7 @@ unqualified until its output and tool behavior have been tested.
 
 Version 0.1.0 is an experimental supervisor and evidence-producing prototype.
 It is useful for controlled local bakeoffs and bounded delegation experiments.
-It is not yet a campaign engine, parallel scheduler, PM control room, automatic
-merge system, or hard real-time spend controller.
+The constrained `gemma4:12b` structured-file path has one successful writable
+qualification. It is not autonomous tool use and is not yet a campaign engine,
+parallel scheduler, PM control room, automatic merge system, or hard real-time
+spend controller.

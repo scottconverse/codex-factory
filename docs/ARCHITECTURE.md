@@ -35,6 +35,18 @@ Terminal reconciliation
 Coordinator acceptance
 ```
 
+The local patch path avoids autonomous model tools:
+
+```text
+Task JSON + declared context
+    -> direct Ollama structured generation
+    -> validate file paths and text artifacts
+    -> write only inside generated Git worktree
+    -> stage and derive real Git diff
+    -> run declared check
+    -> commit only on green
+```
+
 ## Components
 
 ### Configuration
@@ -47,6 +59,15 @@ Provider/accounting mismatches are rejected.
 `scripts/run-worker.mjs` is a dependency-free Node.js process supervisor. It
 constructs an explicit `codex exec` invocation, sends the prompt through stdin,
 and owns the launched process tree.
+
+`scripts/run-local-patch.mjs` calls Ollama directly. The model receives only
+declared file contents and returns complete text for allowlisted files. It
+cannot select commands or filesystem paths outside the task contract.
+
+Model discovery, qualification, adaptive selection, and fleet scheduling are
+deliberately outside this prototype. DevHarmonics already implements those
+control-plane responsibilities; duplicating them here would create two policy
+engines with different evidence.
 
 ### Durable local state
 
@@ -68,6 +89,7 @@ a Codex skill. Version 0.1.0 does not install the skill automatically.
 - Operating-system process controls are the final wall-clock stop mechanism.
 - Terminal usage events are trusted for accounting because no in-turn usage
   signal is currently exposed.
+- Local token counts are telemetry, not financial admission controls.
 
 ## Failure policy
 
