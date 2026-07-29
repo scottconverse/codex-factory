@@ -13,13 +13,15 @@ process tree, and retains selection and execution evidence.
 [Worker model ladder](docs/MODEL-LADDER.md) ·
 [Changelog](CHANGELOG.md)
 
-## What 0.1.1 includes
+## What the coordinator includes
 
 - discovery of every installed Ollama model plus configured Sol, Terra, and Luna candidates;
 - fingerprinted analysis, structured-reasoning benchmark, structured-write,
   and workspace-write qualification;
 - automatic selection from the currently qualified pool;
-- dry-run by default and one worker at a time;
+- a campaign coordinator that accepts a prompt/specification plus a dependency plan;
+- dry-run by default, with up to four explicitly declared non-overlapping workers;
+- one qualified local attempt first, then explicit Luna and Terra fallbacks;
 - single-use task IDs and no automatic retries;
 - lock-scoped aggregate budget admission and durable reservations;
 - wall-clock timeout, interrupt handling, and owned process-tree cleanup;
@@ -60,9 +62,27 @@ task.
 See the [user manual](docs/USER-MANUAL.md) for task contracts, route details,
 execution, receipts, recovery, and troubleshooting.
 
+## Coordinate a campaign
+
+Put the owner prompt or specification beside a small campaign plan. The included
+example is safe by default: it only previews selection and scheduling.
+
+```powershell
+node scripts/run-campaign.mjs --plan-file examples/campaign-plan.json
+```
+
+The plan has named tasks, exact read/write paths, dependencies, checks, and a
+`parallelSafe` declaration. Tasks may share a batch only when their paths do
+not overlap in either direction. The coordinator first dispatches one current
+qualified local model for each task. A fast local failure falls back to
+`gpt-5.6-luna`, then `gpt-5.6-terra`, when those exact routes are currently
+qualified and admitted by the paid ledger. Add `--execute` only after reviewing
+the preview; execution creates an isolated integration worktree and never
+merges it into your branch automatically.
+
 ## Important boundary
 
-Codex reports token usage after a model turn. Version 0.1.1 can reject an unsafe
+Codex reports token usage after a model turn. Version 0.1.2 can reject an unsafe
 launch and mark a terminal result over budget, but it cannot interrupt a single
 turn at an exact token count. Wall-clock timeout and process ownership are the
 hard runtime controls.
@@ -90,9 +110,9 @@ The preview server uses `http://127.0.0.1:4173` by default. Set
 
 ## Status
 
-Version 0.1.1 is an evidence-producing prototype for controlled delegation
-experiments. It is not a campaign engine, parallel scheduler, PM control room,
-automatic merge system, semantic verifier, or hard real-time spend controller.
+Codex Factory is an evidence-producing coordinator for controlled delegation.
+It is not a PM control room, automatic merge system, semantic verifier, or hard
+real-time spend controller.
 Candidate availability is discovered rather than hardcoded. Qualification is
 role scoped: a model may qualify for analysis and fail structured writes without
 being removed from the fleet. The current host must qualify its exact runtime
@@ -103,7 +123,7 @@ fingerprints before routing begins.
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Worker model ladder](docs/MODEL-LADDER.md)
-- [0.1.1 release notes](docs/RELEASE-NOTES-0.1.1.md)
+- [0.1.2 release notes](docs/RELEASE-NOTES-0.1.2.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
 - [Experiment plan](docs/EXPERIMENT-PLAN.md)
 - [Bakeoff ledger](docs/BAKEOFF-LEDGER.md)

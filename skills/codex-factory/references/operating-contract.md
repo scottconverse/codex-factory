@@ -12,14 +12,14 @@ Every worker request must name:
 Workers are leaves. They do not delegate, broaden scope, merge, publish, install,
 or make product decisions. The coordinator does not repeat assigned work.
 
-The runner writes local receipts under `.codex-factory/runs/`. Under the
-single-worker lock it rejects reused task IDs, rechecks the aggregate budget,
-and persists the reservation before launch. A terminal entry reconciles that
-reservation. Missing or malformed paid usage closes the paid lane. Usage above
-the reserved amount fails the result even though the CLI exposes it only at turn
-completion. A timeout or supervisor interrupt terminates and reaps the exact
-owned child process tree. If reaping cannot be confirmed, the lock remains as a
-stop condition for operator investigation.
+The runner writes receipts under `.codex-factory/runs/` and campaigns under
+`.codex-factory/campaigns/`. Worker slots bound concurrent execution; the paid
+ledger lock rejects reused task IDs, rechecks aggregate budget, and persists the
+reservation before launch. A terminal entry reconciles that reservation. Missing
+or malformed paid usage closes the paid lane. Campaign tasks try one qualified
+local model first, then explicit Luna and Terra fallbacks. Usage above the
+reserved amount fails the result even though the CLI exposes it only at turn
+completion.
 
 Local Ollama work has no token reservation or aggregate token-spend budget.
 Local tokens are telemetry. Wall time, concurrency, attempts, context/output

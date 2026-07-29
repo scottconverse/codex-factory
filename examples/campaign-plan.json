@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "campaignId": "example-doc-review",
+  "repository": ".",
+  "base": "HEAD",
+  "maxParallel": 1,
+  "localAttemptMinutes": 3,
+  "sourceFile": "examples/campaign-source.md",
+  "tasks": [
+    {
+      "id": "readme-review",
+      "role": "standard",
+      "instructions": "Update only the README documentation required by the campaign source.",
+      "readPaths": ["README.md"],
+      "writePaths": ["README.md"],
+      "dependsOn": [],
+      "parallelSafe": false,
+      "check": { "command": "node", "args": ["--check", "scripts/run-campaign.mjs"] },
+      "commitMessage": "docs: review campaign README"
+    }
+  ]
+}

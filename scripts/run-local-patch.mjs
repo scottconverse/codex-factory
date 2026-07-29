@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 import {
   appendFileSync,
-  closeSync,
   existsSync,
   lstatSync,
   mkdirSync,
-  openSync,
   readFileSync,
   realpathSync,
   rmSync,
@@ -17,6 +15,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
+import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const OLLAMA_GENERATE_URL = "http://127.0.0.1:11434/api/generate";
@@ -57,6 +56,7 @@ export function validateLocalTask(task) {
     throw new Error("Local task requiredTier is invalid");
   }
   assertPositiveInteger(task.timeoutMinutes, "timeoutMinutes", 30);
+  if (task.deadlineMs !== undefined && (!Number.isSafeInteger(task.deadlineMs) || task.deadlineMs <= Date.now())) throw new Error("deadlineMs must be a future millisecond timestamp");
   assertPositiveInteger(task.maxOutputTokens, "maxOutputTokens", 16_384);
   assertPositiveInteger(task.maxContextBytes, "maxContextBytes", 1_000_000);
   if (typeof task.instructions !== "string" || task.instructions.trim().length < 10) throw new Error("Local task instructions are incomplete");
@@ -77,6 +77,12 @@ export function validateLocalTask(task) {
     throw new Error("Local tasks use time and capacity limits; token counts are telemetry");
   }
   return task;
+}
+
+function remainingAttemptMs(deadlineMs) {
+  const remaining = deadlineMs - Date.now();
+  if (remaining <= 0) throw new Error("Local attempt deadline exhausted");
+  return remaining;
 }
 
 export function buildOllamaRequest({ task, prompt }) {
@@ -365,23 +371,17 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   mkdirSync(stateRoot, { recursive: true });
-  const lockPath = path.resolve(stateRoot, "worker.lock");
-  let lockDescriptor;
-  try {
-    lockDescriptor = openSync(lockPath, "wx");
-    writeFileSync(lockDescriptor, JSON.stringify({ pid: process.pid, taskId: task.taskId, startedAt: new Date().toISOString() }));
-  } catch (error) {
-    if (error.code === "EEXIST") throw new Error("Another local patch worker owns the lock");
-    throw error;
-  } finally {
-    if (lockDescriptor !== undefined) closeSync(lockDescriptor);
-  }
+  const slot = acquireWorkerSlot(path.resolve(ROOT, ".codex-factory"), config.budgets.maxConcurrentWorkers, {
+    taskId: task.taskId,
+    provider: "ollama",
+    model: task.model,
+  });
 
   let runPath = null;
   let worktreePath = null;
   let branch = null;
   try {
-    if (taskWasAttempted(ledgerPath, task.taskId)) throw new Error(`Task ${task.taskId} already has an attempt`);
+    const deadlineMs = task.deadlineMs ?? Date.now() + task.timeoutMinutes * 60_000;
     const startedAt = new Date();
     const runId = `${startedAt.toISOString().replace(/[:.]/g, "-")}-${task.taskId}`;
     runPath = path.resolve(stateRoot, "runs", runId);
@@ -389,23 +389,29 @@ export async function main(argv = process.argv.slice(2)) {
     branch = `codex-factory/${task.taskId}-${startedAt.getTime()}`;
     mkdirSync(runPath, { recursive: true });
     mkdirSync(path.dirname(worktreePath), { recursive: true });
-    appendFileSync(ledgerPath, `${JSON.stringify({
-      stage: "started",
-      runId,
-      taskId: task.taskId,
-      provider: "ollama",
-      model: task.model,
-      paid: false,
-      startedAt: startedAt.toISOString(),
-    })}\n`);
+    const ledgerLock = await acquireFileLock(path.resolve(stateRoot, "ledger.lock"), { taskId: task.taskId });
+    try {
+      if (taskWasAttempted(ledgerPath, task.taskId)) throw new Error(`Task ${task.taskId} already has an attempt`);
+      appendFileSync(ledgerPath, `${JSON.stringify({
+        stage: "started",
+        runId,
+        taskId: task.taskId,
+        provider: "ollama",
+        model: task.model,
+        paid: false,
+        startedAt: startedAt.toISOString(),
+      })}\n`);
+    } finally {
+      ledgerLock.release();
+    }
     git(["worktree", "add", "-b", branch, worktreePath, task.base], repository);
     const prompt = buildPrompt(task, worktreePath);
     const request = buildOllamaRequest({ task, prompt });
     writeFileSync(path.resolve(runPath, "request.json"), `${JSON.stringify({ ...preview, execute: true, runId, worktreePath, branch, taskFile, prompt }, null, 2)}\n`);
-    const baseline = await runCheck(task.check, worktreePath, task.timeoutMinutes * 60_000);
+    const baseline = await runCheck(task.check, worktreePath, remainingAttemptMs(deadlineMs));
     writeFileSync(path.resolve(runPath, "baseline.json"), `${JSON.stringify(baseline, null, 2)}\n`);
 
-    const rawResponse = await requestOllama(request, task.timeoutMinutes * 60_000);
+    const rawResponse = await requestOllama(request, remainingAttemptMs(deadlineMs));
     writeFileSync(path.resolve(runPath, "ollama-response.json"), `${rawResponse}\n`);
     const generated = parseOllamaResponse(rawResponse);
     const generatedFiles = validateGeneratedFiles(generated.artifact.files, task.writePaths);
@@ -420,7 +426,7 @@ export async function main(argv = process.argv.slice(2)) {
       throw new Error("Staged paths differ from the validated generated files");
     }
     writeFileSync(path.resolve(runPath, "candidate.patch"), git(["diff", "--cached", "--binary"], worktreePath).stdout);
-    const check = await runCheck(task.check, worktreePath, task.timeoutMinutes * 60_000);
+    const check = await runCheck(task.check, worktreePath, remainingAttemptMs(deadlineMs));
     writeFileSync(path.resolve(runPath, "check.json"), `${JSON.stringify(check, null, 2)}\n`);
     if (check.timedOut || check.exitCode !== 0) throw new Error(`Required check failed with exit ${check.exitCode}`);
     validateCheckWorkspace(
@@ -447,7 +453,12 @@ export async function main(argv = process.argv.slice(2)) {
       finishedAt: new Date().toISOString(),
     };
     writeFileSync(path.resolve(runPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
-    appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+    const terminalLock = await acquireFileLock(path.resolve(stateRoot, "ledger.lock"), { taskId: task.taskId, stage: "terminal" });
+    try {
+      appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+    } finally {
+      terminalLock.release();
+    }
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return result;
   } catch (error) {
@@ -476,10 +487,15 @@ export async function main(argv = process.argv.slice(2)) {
       finishedAt: new Date().toISOString(),
     };
     if (runPath) writeFileSync(path.resolve(runPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
-    appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+    const terminalLock = await acquireFileLock(path.resolve(stateRoot, "ledger.lock"), { taskId: task.taskId, stage: "terminal" });
+    try {
+      appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+    } finally {
+      terminalLock.release();
+    }
     throw error;
   } finally {
-    rmSync(lockPath, { force: true });
+    slot.release();
   }
 }
 

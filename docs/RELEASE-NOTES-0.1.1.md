@@ -20,7 +20,7 @@ qualification-gated candidate pool.
 - The constrained local patch runner selects from the currently qualified pool
   instead of naming one model.
 
-## Current operating boundary
+## Historical operating boundary at the 0.1.1 release
 
 The factory still runs one worker at a time and never retries automatically.
 Local inference is bounded by wall time and capacity; its token counts are

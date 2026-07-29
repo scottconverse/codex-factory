@@ -18,7 +18,7 @@ Runner preflight
     |-- confirm Git repository
     |-- preview exact provider/model/sandbox command
     v
-Single-worker lock
+Worker-slot and ledger locks
     |-- reject duplicate task ID
     |-- recheck aggregate budget
     |-- persist reservation
@@ -54,7 +54,13 @@ Task JSON + declared context
 `factory.config.json` is the operator-controlled routing and budget policy.
 Provider/accounting mismatches are rejected.
 
-### Supervisor
+### Campaign coordinator and supervisor
+
+`scripts/run-campaign.mjs` reads a campaign source and validated dependency
+plan, dispatches only independent non-overlapping tasks, and integrates accepted
+commits into an isolated branch. Its ladder is one qualified Ollama attempt,
+then explicit Luna, then Terra. It retains the integration result for owner
+inspection and never auto-merges the owner branch.
 
 `scripts/run-worker.mjs` is a dependency-free Node.js process supervisor. It
 constructs an explicit `codex exec` invocation, sends the prompt through stdin,
@@ -73,8 +79,10 @@ embedding-only inventory remains visible but is not treated as a subagent.
 
 ### Durable local state
 
-`.codex-factory/` contains an execution lock, an append-only usage ledger, and
-per-run evidence. It is intentionally outside version control.
+`.codex-factory/` contains worker slots, an append-only usage ledger, campaign
+receipts, and per-run evidence. A dead-PID slot or ledger lock is reclaimed only
+by a later acquisition; live owners are never removed. The directory is
+intentionally outside version control.
 
 ### Operator skill
 
@@ -98,18 +106,16 @@ a Codex skill. Version 0.1.1 does not install the skill automatically.
 The system fails closed where evidence is missing:
 
 - an invalid task contract prevents launch;
-- an existing lock prevents launch;
+- all live worker slots prevent launch;
 - a reused task ID prevents launch;
 - insufficient aggregate budget prevents launch;
 - unknown paid usage prevents later paid admission;
 - an unreaped process preserves the lock;
 - nonempty output and zero exit are still reported only as process completion.
 
-## Not included in 0.1.1
+## Not included
 
-- parallel scheduling;
-- campaign persistence and dependency graphs;
-- automatic worktree creation or merges;
+- automatic merge to an owner branch;
 - semantic acceptance verification;
 - remote control plane or web application;
 - MCP server;

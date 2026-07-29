@@ -10,7 +10,7 @@
 | Machine-readable receipts | `codex exec --json` | Reuse and normalize |
 | Token budgets | Usage events plus supervisor policy | Thin layer required |
 | Process lifecycle | Child PID and process-tree supervision | Thin layer required |
-| Durable campaigns and dependency graph | No complete native contract identified | Evaluate |
+| Durable campaigns and dependency graph | Factory campaign plan and isolated integration worktree | Implemented locally |
 | Product-owner approval policy | Prompts, permissions, hooks, skills | Evaluate |
 | Cross-provider qualification history | Partial provider/model configuration | Likely differentiated |
 | PM-facing Control Room | Desktop task/subagent views are partial | Evaluate |

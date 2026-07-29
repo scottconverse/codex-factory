@@ -12,16 +12,17 @@ test("parseArgs keeps execution opt-in", () => {
   assert.equal(parseArgs(["--execute"]).execute, true);
 });
 
-test("validateConfig rejects concurrency and retry expansion", () => {
+test("validateConfig permits bounded concurrency and rejects retry or fleet expansion", () => {
   const base = {
     version: 1,
-    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 2, maxConcurrentWorkers: 1 },
+    budgets: { aggregatePaidTokens: 1, maxWorkerMinutes: 1, maxAttemptsPerTask: 2, maxConcurrentWorkers: 3 },
     routes: {},
   };
   assert.throws(() => validateConfig(base), /exactly one attempt/);
   base.budgets.maxAttemptsPerTask = 1;
-  base.budgets.maxConcurrentWorkers = 2;
-  assert.throws(() => validateConfig(base), /exactly one worker/);
+  assert.equal(validateConfig(base), base);
+  base.budgets.maxConcurrentWorkers = 5;
+  assert.throws(() => validateConfig(base), /between 1 and 4/);
 });
 
 test("validateConfig rejects unaccounted providers and invalid reasoning effort", () => {
@@ -94,6 +95,14 @@ test("route resolution selects from all currently qualified candidates instead o
     { provider: route.provider, model: route.model, sandbox: route.sandbox, paid: route.paid },
     { provider: "ollama", model: "qwen3.5:9b", sandbox: "read-only", paid: false },
   );
+  const pinned = resolveRouteCandidate({
+    config,
+    role: "mechanical",
+    candidates,
+    qualifications,
+    candidateId: paid.id,
+  });
+  assert.equal(pinned.model, "gpt-5.6-luna");
 });
 
 test("summarizeUsage rejects missing receipts and counts input plus output once", () => {
@@ -151,14 +160,14 @@ test("fleet smoke requires overlapping worker intervals", () => {
 
 test("fleet smoke validates independently observed repository facts", () => {
   assert.deepEqual(
-    validateSmokeArtifact("package", '{"task":"package","name":"codex-factory","version":"0.1.1"}'),
-    { task: "package", name: "codex-factory", version: "0.1.1" },
+    validateSmokeArtifact("package", '{"task":"package","name":"codex-factory","version":"0.1.2"}'),
+    { task: "package", name: "codex-factory", version: "0.1.2" },
   );
   assert.deepEqual(
-    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":1,"discoverOllama":true,"configuredCodexCandidates":3}'),
-    { task: "config", maxConcurrentWorkers: 1, discoverOllama: true, configuredCodexCandidates: 3 },
+    validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":3,"discoverOllama":true,"configuredCodexCandidates":3}'),
+    { task: "config", maxConcurrentWorkers: 3, discoverOllama: true, configuredCodexCandidates: 3 },
   );
-  assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.1"}'), /Package artifact mismatch/);
+  assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.2"}'), /Package artifact mismatch/);
 });
 
 test("fleet smoke pins local and OpenAI providers explicitly", () => {

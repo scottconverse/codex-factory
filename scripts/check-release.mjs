@@ -9,7 +9,7 @@ const version = read("VERSION").trim();
 const packageManifest = JSON.parse(read("package.json"));
 const pluginManifest = JSON.parse(read(".codex-plugin/plugin.json"));
 
-if (!/^0\.1\.1$/.test(version)) throw new Error(`Expected release version 0.1.1, found ${version}`);
+if (!/^0\.1\.2$/.test(version)) throw new Error(`Expected release version 0.1.2, found ${version}`);
 if (packageManifest.version !== version) throw new Error("package.json version disagrees with VERSION");
 if (pluginManifest.version !== version) throw new Error("plugin.json version disagrees with VERSION");
 

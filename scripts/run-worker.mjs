@@ -1,12 +1,9 @@
 #!/usr/bin/env node
 import {
   appendFileSync,
-  closeSync,
   existsSync,
   mkdirSync,
-  openSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
 import { spawn, spawnSync } from "node:child_process";
@@ -14,6 +11,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
+import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -44,7 +42,9 @@ export function validateConfig(config) {
     throw new Error("Invalid budget: qualificationMinutes");
   }
   if (config.budgets.maxAttemptsPerTask !== 1) throw new Error("Initial factory permits exactly one attempt per task");
-  if (config.budgets.maxConcurrentWorkers !== 1) throw new Error("Initial factory permits exactly one worker at a time");
+  if (config.budgets.maxConcurrentWorkers < 1 || config.budgets.maxConcurrentWorkers > 4) {
+    throw new Error("maxConcurrentWorkers must be between 1 and 4");
+  }
   for (const [name, route] of Object.entries(config.routes ?? {})) {
     if (!route.provider) {
       if (!["analysis", "structured_write", "workspace_write"].includes(route.qualificationRole)) {
@@ -78,11 +78,13 @@ export function validateConfig(config) {
   return config;
 }
 
-export function resolveRouteCandidate({ config, role, candidates, qualifications }) {
+export function resolveRouteCandidate({ config, role, candidates, qualifications, candidateId = null }) {
   const requirement = config.routes?.[role];
   if (!requirement) throw new Error(`Unknown role: ${role}`);
+  const available = candidateId ? candidates.filter((candidate) => candidate.id === candidateId) : candidates;
+  if (candidateId && !available.length) throw new Error(`Unknown candidate: ${candidateId}`);
   const selected = selectCandidate({
-    candidates,
+    candidates: available,
     qualifications,
     role: requirement.qualificationRole,
     requiredTier: requirement.requiredTier,
@@ -243,13 +245,25 @@ export async function main(argv = process.argv.slice(2)) {
   const ollama = await discoverOllama().catch(() => ({ runtimeVersion: "unavailable", models: [] }));
   const candidates = discoverCandidatePool({ config, ollama });
   const qualifications = readJsonLines(path.join(ROOT, ".codex-factory", "qualifications.jsonl"));
-  const route = resolveRouteCandidate({ config, role: options.role, candidates, qualifications });
+  const route = resolveRouteCandidate({
+    config,
+    role: options.role,
+    candidates,
+    qualifications,
+    candidateId: options.candidateId ?? null,
+  });
   const cwd = path.resolve(options.cwd);
   const promptPath = path.resolve(options.promptFile);
   assertGitRepository(cwd);
   const prompt = readFileSync(promptPath, "utf8");
   for (const marker of ["Acceptance criteria", "Allowed paths", "Required checks", "Do not delegate"]) {
     if (!prompt.includes(marker)) throw new Error(`Prompt is missing required marker: ${marker}`);
+  }
+  const timeoutMinutes = options.timeoutMinutes === undefined
+    ? config.budgets.maxWorkerMinutes
+    : Number(options.timeoutMinutes);
+  if (!Number.isSafeInteger(timeoutMinutes) || timeoutMinutes < 1 || timeoutMinutes > config.budgets.maxWorkerMinutes) {
+    throw new Error(`--timeout-minutes must be between 1 and ${config.budgets.maxWorkerMinutes}`);
   }
 
   const stateRoot = path.join(ROOT, ".codex-factory");
@@ -271,7 +285,7 @@ export async function main(argv = process.argv.slice(2)) {
     tokenAccounting: route.paid ? "admission-and-reconciliation" : "telemetry-only",
     spent,
     remaining,
-    timeoutMinutes: config.budgets.maxWorkerMinutes,
+    timeoutMinutes,
     command: invocation.command,
     args: invocation.args,
     execute: options.execute,
@@ -282,52 +296,57 @@ export async function main(argv = process.argv.slice(2)) {
   }
 
   mkdirSync(stateRoot, { recursive: true });
-  const lockPath = path.join(stateRoot, "worker.lock");
-  let lockOwned = false;
+  const slot = acquireWorkerSlot(stateRoot, config.budgets.maxConcurrentWorkers, {
+    taskId: options.taskId,
+    provider: route.provider,
+    model: route.model,
+  });
   let preserveLock = false;
   try {
-    let lockDescriptor;
+    let ledgerLock = await acquireFileLock(path.join(stateRoot, "usage.lock"), { taskId: options.taskId });
+    let lockedSpent;
+    let lockedRemaining;
+    let runId;
+    let runPath;
+    let outputPath;
+    let eventsPath;
+    let stderrPath;
+    let exactInvocation;
+    let startedAt;
     try {
-      lockDescriptor = openSync(lockPath, "wx");
-      lockOwned = true;
-      writeFileSync(lockDescriptor, JSON.stringify({ pid: process.pid, taskId: options.taskId, startedAt: new Date().toISOString() }));
-    } catch (error) {
-      if (error.code === "EEXIST") throw new Error(`Another worker owns ${lockPath}`);
-      throw error;
+      if (taskWasAttempted(ledgerPath, options.taskId)) throw new Error(`Task ${options.taskId} already has an attempt`);
+      lockedSpent = route.paid ? usageSpent(ledgerPath, true) : null;
+      lockedRemaining = route.paid ? aggregateLimit - lockedSpent : null;
+      if (route.paid && route.tokenReservation > lockedRemaining) {
+        throw new Error(`Route reservation ${route.tokenReservation} exceeds remaining budget ${lockedRemaining}`);
+      }
+      const executionPreview = { ...preview, spent: lockedSpent, remaining: lockedRemaining };
+
+      startedAt = new Date();
+      runId = `${startedAt.toISOString().replace(/[:.]/g, "-")}-${options.taskId}`;
+      runPath = path.join(stateRoot, "runs", runId);
+      mkdirSync(runPath, { recursive: true });
+      outputPath = path.join(runPath, "last-message.txt");
+      eventsPath = path.join(runPath, "events.jsonl");
+      stderrPath = path.join(runPath, "stderr.log");
+      exactInvocation = buildInvocation({ route, cwd, outputPath });
+      writeFileSync(path.join(runPath, "request.json"), `${JSON.stringify({ ...executionPreview, args: exactInvocation.args, promptPath, startedAt: startedAt.toISOString() }, null, 2)}\n`);
+      writeFileSync(eventsPath, "");
+      writeFileSync(stderrPath, "");
+      appendFileSync(ledgerPath, `${JSON.stringify({
+        stage: "reserved",
+        runId,
+        taskId: options.taskId,
+        role: options.role,
+        provider: route.provider,
+        model: route.model,
+        paid: route.paid,
+        reservedTokens: route.paid ? route.tokenReservation : null,
+        startedAt: startedAt.toISOString(),
+      })}\n`);
     } finally {
-      if (lockDescriptor !== undefined) closeSync(lockDescriptor);
+      ledgerLock.release();
     }
-
-    if (taskWasAttempted(ledgerPath, options.taskId)) throw new Error(`Task ${options.taskId} already has an attempt`);
-    const lockedSpent = route.paid ? usageSpent(ledgerPath, true) : null;
-    const lockedRemaining = route.paid ? aggregateLimit - lockedSpent : null;
-    if (route.paid && route.tokenReservation > lockedRemaining) {
-      throw new Error(`Route reservation ${route.tokenReservation} exceeds remaining budget ${lockedRemaining}`);
-    }
-    const executionPreview = { ...preview, spent: lockedSpent, remaining: lockedRemaining };
-
-    const startedAt = new Date();
-    const runId = `${startedAt.toISOString().replace(/[:.]/g, "-")}-${options.taskId}`;
-    const runPath = path.join(stateRoot, "runs", runId);
-    mkdirSync(runPath, { recursive: true });
-    const outputPath = path.join(runPath, "last-message.txt");
-    const eventsPath = path.join(runPath, "events.jsonl");
-    const stderrPath = path.join(runPath, "stderr.log");
-    const exactInvocation = buildInvocation({ route, cwd, outputPath });
-    writeFileSync(path.join(runPath, "request.json"), `${JSON.stringify({ ...executionPreview, args: exactInvocation.args, promptPath, startedAt: startedAt.toISOString() }, null, 2)}\n`);
-    writeFileSync(eventsPath, "");
-    writeFileSync(stderrPath, "");
-    appendFileSync(ledgerPath, `${JSON.stringify({
-      stage: "reserved",
-      runId,
-      taskId: options.taskId,
-      role: options.role,
-      provider: route.provider,
-      model: route.model,
-      paid: route.paid,
-      reservedTokens: route.paid ? route.tokenReservation : null,
-      startedAt: startedAt.toISOString(),
-    })}\n`);
 
     let processResult;
     let executionError = null;
@@ -335,14 +354,17 @@ export async function main(argv = process.argv.slice(2)) {
       processResult = await executeWorker({
         invocation: exactInvocation,
         prompt,
-        timeoutMs: config.budgets.maxWorkerMinutes * 60_000,
+        timeoutMs: timeoutMinutes * 60_000,
         eventsPath,
         stderrPath,
       });
     } catch (error) {
       executionError = error;
       processResult = { exitCode: null, timedOut: false, interrupted: null };
-      if (error.code === "WORKER_NOT_REAPED") preserveLock = true;
+      if (error.code === "WORKER_NOT_REAPED") {
+        preserveLock = true;
+        slot.quarantine({ taskId: options.taskId, runId, reason: "worker-not-reaped" });
+      }
       appendFileSync(stderrPath, `\nRunner error: ${error.message}\n`);
     }
     let usage = null;
@@ -373,12 +395,17 @@ export async function main(argv = process.argv.slice(2)) {
       runPath,
     };
     writeFileSync(path.join(runPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
-    appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+    ledgerLock = await acquireFileLock(path.join(stateRoot, "usage.lock"), { taskId: options.taskId, stage: "terminal" });
+    try {
+      appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
+    } finally {
+      ledgerLock.release();
+    }
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (status !== "process_completed") process.exitCode = 1;
     return result;
   } finally {
-    if (lockOwned && !preserveLock) rmSync(lockPath, { force: true });
+    if (!preserveLock) slot.release();
   }
 }
 

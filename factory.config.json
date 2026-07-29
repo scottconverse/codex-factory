@@ -5,7 +5,7 @@
     "maxWorkerMinutes": 30,
     "qualificationMinutes": 3,
     "maxAttemptsPerTask": 1,
-    "maxConcurrentWorkers": 1
+    "maxConcurrentWorkers": 3
   },
   "candidates": {
     "ollama": {
@@ -40,7 +40,7 @@
     },
     "standard": {
       "qualificationRole": "workspace_write",
-      "requiredTier": "standard",
+      "requiredTier": "economy",
       "sandbox": "workspace-write"
     },
     "review": {

@@ -21,9 +21,11 @@ acceptance criteria and writable scope are already known.
 6. Inspect the printed model, provider, sandbox, reservation, timeout, and
    remaining aggregate budget.
 7. Add `--execute` only when the dry run matches the approved task.
-8. Treat `.codex-factory/runs/<run>/result.json` as the receipt. Hand the
-   candidate and focused test evidence to the owner-selected outside auditor;
-   the implementing coordinator does not self-audit this project.
+8. For multi-task work, use `node scripts/run-campaign.mjs --plan-file <plan>`
+   first. Keep only non-overlapping independent tasks parallel; it routes local
+   first, then Luna, then Terra, and leaves an integration branch for review.
+9. Treat `.codex-factory/runs/<run>/result.json` or the campaign result as the
+   receipt. Obtain a fresh-context adversarial audit before accepting code.
 
 For a qualified constrained local write, use
 `node scripts/run-local-patch.mjs --task-file <task.json>` for preview and add

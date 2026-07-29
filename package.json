@@ -1,13 +1,13 @@
 {
   "name": "codex-factory",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
   "description": "Budgeted boss-and-worker orchestration for Codex and qualified local models.",
   "scripts": {
     "test": "node --test",
-    "check": "node --check scripts/factory-fleet.mjs && node --check scripts/qualify-fleet.mjs && node --check scripts/run-worker.mjs && node --check scripts/run-local-patch.mjs && node --check scripts/fleet-smoke.mjs && node --check scripts/build-site.mjs && node --check scripts/check-site.mjs && node --check scripts/check-release.mjs && node --check scripts/serve-site.mjs && node --test",
+    "check": "node --check scripts/factory-fleet.mjs && node --check scripts/qualify-fleet.mjs && node --check scripts/run-worker.mjs && node --check scripts/run-local-patch.mjs && node --check scripts/factory-campaign.mjs && node --check scripts/factory-slots.mjs && node --check scripts/run-campaign.mjs && node --check scripts/fleet-smoke.mjs && node --check scripts/build-site.mjs && node --check scripts/check-site.mjs && node --check scripts/check-release.mjs && node --check scripts/serve-site.mjs && node --test",
     "local:patch": "node scripts/run-local-patch.mjs",
     "fleet:qualify": "node scripts/qualify-fleet.mjs",
     "fleet:smoke": "node scripts/fleet-smoke.mjs",

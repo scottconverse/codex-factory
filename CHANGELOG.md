@@ -4,6 +4,20 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-29
+
+### Added
+
+- Local-first campaign coordination with dependency-safe parallel scheduling,
+  isolated worktrees, integration receipts, and explicit local, Luna, Terra routing.
+- Shared worker slots, serialized paid admission, cleanup receipts, and bounded
+  local attempt deadlines.
+
+### Changed
+
+- Standard writable work may use a qualified economy-tier Luna fallback; campaign
+  Critical work is intentionally rejected because Sol remains coordinator-only.
+
 ## [0.1.1] - 2026-07-29
 
 ### Added

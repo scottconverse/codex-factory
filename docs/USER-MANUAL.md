@@ -1,6 +1,6 @@
 # Codex Factory user manual
 
-Version 0.1.1
+Version 0.1.2
 
 ## What Codex Factory is
 
@@ -45,6 +45,27 @@ No npm dependencies are required for the runner.
 
 The repository is also shaped as a Codex plugin. Version 0.1.1 does not install
 it automatically into a personal marketplace; operate it from the checkout.
+
+## Campaign coordination
+
+`scripts/run-campaign.mjs` is the owner-facing coordinator. It reads a source
+prompt/specification and a JSON plan of bounded leaf tasks. Start with the
+included dry-run example:
+
+```powershell
+node scripts/run-campaign.mjs --plan-file examples/campaign-plan.json
+```
+
+Each task declares `readPaths`, `writePaths`, dependencies, one check, and
+`parallelSafe`. The plan rejects undeclared parallel read/write or write/write
+overlap, so only genuinely independent work shares a wave. Each task uses one
+current qualified local attempt with a short wall-clock limit. On failure, the
+coordinator explicitly tries `gpt-5.6-luna`, then `gpt-5.6-terra`, provided the
+exact candidate is qualified and paid admission succeeds. A campaign stays
+dry-run unless `--execute` is supplied. Execution uses isolated worker and
+integration worktrees, retains receipts below `.codex-factory/campaigns/`, and
+leaves the accepted integration branch for owner inspection; it never merges
+the owner branch.
 
 ## The operating model
 
@@ -91,14 +112,19 @@ reasoning benchmark; a protocol-only write response is insufficient.
 | Role policy | Required qualification | Minimum tier | Sandbox |
 |---|---|---|---|
 | `mechanical` | analysis | economy | read-only |
-| `standard` | workspace write | standard | workspace-write |
+| `standard` | workspace write | economy | workspace-write |
 | `review` | analysis | standard | read-only |
 | `critical` | workspace write | premium | workspace-write |
 | `local-read` | analysis | economy | read-only |
 
-Qualified free local candidates are preferred. Metered Codex candidates are
-considered only when no qualified local candidate satisfies the exact role and
-tier.
+Qualified free local candidates are preferred. For a campaign, qualified Luna
+and Terra are an ordered fallback after the one local attempt. The ordinary
+`standard` route allows the economy-tier Luna candidate; critical work still
+requires the premium route.
+
+Campaign plans do not dispatch the `critical` route: Sol remains reserved for
+coordination, while the campaign worker ladder is deliberately local, Luna,
+then Terra. Split or escalate critical work outside this runner.
 
 ## Prepare a task
 
@@ -244,7 +270,7 @@ inspect the artifact and run the required checks.
 The initial configuration permits:
 
 - 250,000 aggregate paid tokens;
-- one worker at a time;
+- one to four configured worker slots;
 - one attempt per task;
 - 30 minutes per worker.
 
@@ -264,9 +290,10 @@ and any future paid API cost budget are separate accounting classes.
 
 ## Process recovery
 
-On timeout or SIGINT/SIGTERM, the runner terminates the owned child process tree
-and waits up to ten seconds for it to close. If closure cannot be confirmed, it
-leaves `.codex-factory/worker.lock` in place to prevent another launch.
+An interrupted process can leave a slot or ledger lock behind. The next runner
+reclaims only a lock whose recorded supervisor PID is no longer alive; it never
+removes a lock owned by a live process. Preserve the run evidence before manual
+cleanup.
 
 Before removing a retained lock:
 
@@ -285,7 +312,7 @@ Edit `factory.config.json` deliberately. Validation requires:
 
 - a positive aggregate allowance for metered OpenAI/Codex candidates;
 - a positive wall-clock limit for each qualification;
-- exactly one attempt and one concurrent worker in 0.1.1;
+- exactly one attempt per task and one to four concurrent worker slots;
 - known role qualifications, tiers, sandboxes, and reasoning efforts;
 - a token reservation for every configured metered Codex candidate;
 - runtime discovery, rather than a fixed Ollama allowlist.
@@ -323,9 +350,7 @@ mark a model qualified or reuse evidence from another role.
 
 ## Current maturity
 
-Version 0.1.1 is an experimental supervisor and evidence-producing prototype.
-It is useful for controlled local bakeoffs and bounded delegation experiments.
-The factory now discovers the real local inventory and tests every
-worker-capable candidate instead of relying on a hardcoded model ladder. It is
-not yet a campaign engine, parallel scheduler, PM control room, automatic merge
-system, or hard real-time spend controller.
+Codex Factory is an experimental evidence-producing coordinator. It discovers
+the real local inventory, dispatches bounded independent tasks, and preserves
+an integration branch for inspection. It is not a PM control room, automatic
+merge system, or hard real-time spend controller.
