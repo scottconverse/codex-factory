@@ -9,7 +9,7 @@ const version = read("VERSION").trim();
 const packageManifest = JSON.parse(read("package.json"));
 const pluginManifest = JSON.parse(read(".codex-plugin/plugin.json"));
 
-if (version !== "0.1.0") throw new Error(`Expected release version 0.1.0, found ${version}`);
+if (!/^0\.1\.1$/.test(version)) throw new Error(`Expected release version 0.1.1, found ${version}`);
 if (packageManifest.version !== version) throw new Error("package.json version disagrees with VERSION");
 if (pluginManifest.version !== version) throw new Error("plugin.json version disagrees with VERSION");
 
@@ -21,7 +21,7 @@ for (const relative of [
   "SECURITY.md",
   "docs/USER-MANUAL.md",
   "docs/ARCHITECTURE.md",
-  "docs/RELEASE-NOTES-0.1.0.md",
+  `docs/RELEASE-NOTES-${version}.md`,
   "site/index.html",
   ".github/workflows/pages.yml",
 ]) {
@@ -35,7 +35,7 @@ const publicText = [
   read("site/index.html"),
 ].join("\n");
 
-if (!publicText.includes("0.1.0")) throw new Error("Public documentation omits version 0.1.0");
+if (!publicText.includes(version)) throw new Error(`Public documentation omits version ${version}`);
 if (/TODO|FIXME|PLACEHOLDER|lorem ipsum|C:\\Users\\/i.test(publicText)) {
   throw new Error("Public documentation contains a placeholder or private local path");
 }

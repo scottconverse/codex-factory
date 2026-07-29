@@ -17,6 +17,7 @@ import { summarizeUsage } from "./run-worker.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PACKAGE_SOURCE = readFileSync(path.join(ROOT, "package.json"), "utf8");
+const PACKAGE = JSON.parse(PACKAGE_SOURCE);
 const CONFIG_SOURCE = readFileSync(path.join(ROOT, "factory.config.json"), "utf8");
 const CONFIG = JSON.parse(CONFIG_SOURCE);
 const TASKS = [
@@ -56,7 +57,7 @@ export function workersOverlap(results) {
 export function validateSmokeArtifact(taskId, text) {
   const artifact = JSON.parse(text);
   if (taskId === "package") {
-    if (artifact.task !== "package" || artifact.name !== "codex-factory" || artifact.version !== "0.1.0") {
+    if (artifact.task !== "package" || artifact.name !== PACKAGE.name || artifact.version !== PACKAGE.version) {
       throw new Error("Package artifact mismatch");
     }
     return artifact;

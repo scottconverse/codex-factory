@@ -4,6 +4,8 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-07-29
+
 ### Added
 
 - Dynamic discovery of every installed Ollama model and configured Codex

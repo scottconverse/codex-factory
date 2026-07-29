@@ -21,7 +21,7 @@ available. Include:
 
 Do not include live API keys, authentication tokens, or private run artifacts.
 
-## Security boundaries in 0.1.0
+## Security boundaries in 0.1.1
 
 - Worker execution is opt-in through `--execute`.
 - Sandboxing is delegated to the selected Codex CLI sandbox.

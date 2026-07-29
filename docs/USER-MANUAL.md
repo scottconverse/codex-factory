@@ -1,6 +1,6 @@
 # Codex Factory user manual
 
-Version 0.1.0
+Version 0.1.1
 
 ## What Codex Factory is
 
@@ -43,7 +43,7 @@ npm.cmd run check
 
 No npm dependencies are required for the runner.
 
-The repository is also shaped as a Codex plugin. Version 0.1.0 does not install
+The repository is also shaped as a Codex plugin. Version 0.1.1 does not install
 it automatically into a personal marketplace; operate it from the checkout.
 
 ## The operating model
@@ -255,7 +255,7 @@ reservation remains charged.
 Codex currently reports token usage after the turn. Therefore the runner can
 reject an unsafe launch and reject an over-budget result, but it cannot
 interrupt a single model turn at an exact token count. The wall-clock timer and
-owned process tree are the hard runtime controls in 0.1.0.
+owned process tree are the hard runtime controls in 0.1.1.
 
 Local Ollama inference has no token-spend ceiling. It is bounded by wall time,
 concurrency, attempts, and context/output safety. Prompt and output token counts
@@ -285,7 +285,7 @@ Edit `factory.config.json` deliberately. Validation requires:
 
 - a positive aggregate allowance for metered OpenAI/Codex candidates;
 - a positive wall-clock limit for each qualification;
-- exactly one attempt and one concurrent worker in 0.1.0;
+- exactly one attempt and one concurrent worker in 0.1.1;
 - known role qualifications, tiers, sandboxes, and reasoning efforts;
 - a token reservation for every configured metered Codex candidate;
 - runtime discovery, rather than a fixed Ollama allowlist.
@@ -323,7 +323,7 @@ mark a model qualified or reuse evidence from another role.
 
 ## Current maturity
 
-Version 0.1.0 is an experimental supervisor and evidence-producing prototype.
+Version 0.1.1 is an experimental supervisor and evidence-producing prototype.
 It is useful for controlled local bakeoffs and bounded delegation experiments.
 The factory now discovers the real local inventory and tests every
 worker-capable candidate instead of relying on a hardcoded model ladder. It is
