@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Codex Factory mark">
+  <rect width="64" height="64" rx="8" fill="#163f33"/>
+  <path d="M13 19h18v10H13zm20 16h18v10H33z" fill="#f4f1e8"/>
+  <path d="M31 24h8v16h-8z" fill="#e56c3e"/>
+  <path d="M9 48h46" stroke="#e56c3e" stroke-width="4"/>
+</svg>
