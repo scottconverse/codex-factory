@@ -4,6 +4,16 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-29
+
+### Changed
+
+- Rebuilt the public landing page around discovered, role-qualified worker
+  selection and the measured local qualification results.
+- Clarified the product's current serial-execution, paid-model, campaign,
+  automatic-merge, MCP, and in-turn token-control boundaries.
+- Licensed the project under the Apache License 2.0.
+
 ## [0.1.1] - 2026-07-29
 
 ### Added
