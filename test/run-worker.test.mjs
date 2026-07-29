@@ -160,14 +160,14 @@ test("fleet smoke requires overlapping worker intervals", () => {
 
 test("fleet smoke validates independently observed repository facts", () => {
   assert.deepEqual(
-    validateSmokeArtifact("package", '{"task":"package","name":"codex-factory","version":"0.1.2"}'),
-    { task: "package", name: "codex-factory", version: "0.1.2" },
+    validateSmokeArtifact("package", '{"task":"package","name":"codex-factory","version":"0.1.3"}'),
+    { task: "package", name: "codex-factory", version: "0.1.3" },
   );
   assert.deepEqual(
     validateSmokeArtifact("config", '{"task":"config","maxConcurrentWorkers":3,"discoverOllama":true,"configuredCodexCandidates":3}'),
     { task: "config", maxConcurrentWorkers: 3, discoverOllama: true, configuredCodexCandidates: 3 },
   );
-  assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.2"}'), /Package artifact mismatch/);
+  assert.throws(() => validateSmokeArtifact("package", '{"task":"package","name":"wrong","version":"0.1.3"}'), /Package artifact mismatch/);
 });
 
 test("fleet smoke pins local and OpenAI providers explicitly", () => {

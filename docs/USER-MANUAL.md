@@ -1,6 +1,6 @@
 # Codex Factory user manual
 
-Version 0.1.2
+Version 0.1.3
 
 ## What Codex Factory is
 

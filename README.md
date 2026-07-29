@@ -82,7 +82,7 @@ merges it into your branch automatically.
 
 ## Important boundary
 
-Codex reports token usage after a model turn. Version 0.1.2 can reject an unsafe
+Codex reports token usage after a model turn. Version 0.1.3 can reject an unsafe
 launch and mark a terminal result over budget, but it cannot interrupt a single
 turn at an exact token count. Wall-clock timeout and process ownership are the
 hard runtime controls.
@@ -123,7 +123,7 @@ fingerprints before routing begins.
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Worker model ladder](docs/MODEL-LADDER.md)
-- [0.1.2 release notes](docs/RELEASE-NOTES-0.1.2.md)
+- [0.1.3 release notes](docs/RELEASE-NOTES-0.1.3.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
 - [Experiment plan](docs/EXPERIMENT-PLAN.md)
 - [Bakeoff ledger](docs/BAKEOFF-LEDGER.md)

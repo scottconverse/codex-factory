@@ -4,6 +4,12 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-29
+
+### Fixed
+
+- Clarified that premium Critical work is outside campaign-worker dispatch.
+
 ## [0.1.2] - 2026-07-29
 
 ### Added
