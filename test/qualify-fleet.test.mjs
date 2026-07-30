@@ -82,8 +82,8 @@ test("qualification fixture cleanup uses bounded Windows-friendly retries", () =
     options: {
       recursive: true,
       force: true,
-      maxRetries: 3,
-      retryDelay: 50,
+      maxRetries: 10,
+      retryDelay: 100,
     },
   });
 });

@@ -12,7 +12,7 @@ export function removeTemporaryRoot(root) {
   rmSync(root, {
     recursive: true,
     force: true,
-    maxRetries: 3,
-    retryDelay: 50,
+    maxRetries: 10,
+    retryDelay: 100,
   });
 }
