@@ -134,6 +134,40 @@ test("shared supervisor rejects a child tree that misses the reap deadline", asy
   );
 });
 
+test("shared supervisor terminates a child that exceeds its stdout limit", async () => {
+  const child = new EventEmitter();
+  child.pid = 1234;
+  child.exitCode = null;
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = new EventEmitter();
+  child.stdin.end = () => {};
+  const signalSource = new EventEmitter();
+  const execution = superviseProcess({
+    command: "fake",
+    args: [],
+    cwd: ".",
+    prompt: "",
+    timeoutMs: 1_000,
+    maxStdoutBytes: 4,
+    spawnImpl: () => child,
+    terminateImpl: () => {
+      child.exitCode = 1;
+      queueMicrotask(() => child.emit("close", 1));
+    },
+    signalSource,
+  });
+  child.stdout.emit("data", Buffer.from("12345"));
+  await assert.rejects(
+    execution,
+    (error) => error.code === "PROCESS_OUTPUT_LIMIT"
+      && error.stream === "stdout"
+      && error.limitBytes === 4,
+  );
+  assert.equal(signalSource.listenerCount("SIGINT"), 0);
+  assert.equal(signalSource.listenerCount("SIGTERM"), 0);
+});
+
 test("shared supervisor terminates and reaps a real child after timeout", async (t) => {
   let result;
   const root = createTemporaryRoot(t, "codex-factory-natural-exit-");

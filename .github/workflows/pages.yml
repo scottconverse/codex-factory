@@ -30,9 +30,45 @@ jobs:
       - name: Check website
         run: npm run site:check
 
+  router-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements-router-bootstrap.lock
+            requirements-router.lock
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install hash-locked router environment
+        run: |
+          python -m pip install --require-hashes --only-binary=:all: --upgrade -r requirements-router-bootstrap.lock
+          python -m pip install --require-hashes -r requirements-router.lock
+          python -m pip install --no-deps --no-build-isolation --editable third_party/routellm --editable python
+      - name: Verify router offline
+        env:
+          HF_HUB_OFFLINE: "1"
+          TRANSFORMERS_OFFLINE: "1"
+          HF_DATASETS_OFFLINE: "1"
+        run: |
+          python -m unittest discover -s python/tests -v
+          CODEX_FACTORY_ROUTER_PYTHON="$(python -c 'import sys; print(sys.executable)')" node --test test/router-adapter.integration.mjs
+
   build-pages:
     if: github.event_name != 'pull_request'
-    needs: checks
+    needs: [checks, router-checks]
     runs-on: ubuntu-latest
     permissions:
       contents: read

@@ -25,6 +25,7 @@ import {
 import { discoverCandidatePool, discoverOllama } from "./factory-fleet.mjs";
 import { validateConfig } from "./run-worker.mjs";
 import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
+import { classifyFactoryRole } from "./factory-role-classifier.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const USAGE = `Usage:
@@ -44,6 +45,74 @@ function parseArgs(argv) {
   if (options.help) return options;
   if (!options.planFile) throw new Error("Missing --plan-file");
   return options;
+}
+
+function inferredTaskContract(task) {
+  const readRole = ["local-read", "mechanical", "review"].includes(task.role);
+  const accessFamily = task.accessFamily ?? (task.writePaths.length ? "write" : (readRole ? "read" : "write"));
+  const taskType = task.taskType ?? ({
+    "local-read": "inventory",
+    mechanical: "mechanical",
+    review: "review",
+    standard: "implementation",
+  })[task.role];
+  return {
+    id: task.id,
+    requestedRole: task.role,
+    accessFamily,
+    taskType,
+    instructions: task.instructions,
+    acceptance: ["Complete the declared campaign scope and pass its required check."],
+    readPaths: task.readPaths,
+    writePaths: accessFamily === "write" ? task.writePaths : [],
+    checks: [`${task.check.command} ${task.check.args.join(" ")}`.trim()],
+    dependencies: task.dependsOn.length,
+    parallelSafe: task.parallelSafe,
+  };
+}
+
+export async function classifyCampaignPlan({
+  plan,
+  classification,
+  receiptRoot,
+  classifyTask = classifyFactoryRole,
+}) {
+  if (!classification || classification.mode === "off") {
+    const automatic = plan.tasks.find((task) => task.role === "auto");
+    if (automatic) throw new Error(`Campaign task ${automatic.id} uses role auto but classification mode is off`);
+    return { plan, classifications: [], previewOnly: false };
+  }
+  const classifications = [];
+  const tasks = [];
+  for (const task of plan.tasks) {
+    if (task.role !== "auto" && !classification.checkExplicitRoles) {
+      tasks.push(task);
+      continue;
+    }
+    const receipt = await classifyTask({
+      task: inferredTaskContract(task),
+      classification,
+      receiptDirectory: receiptRoot ? path.join(receiptRoot, task.id) : undefined,
+    });
+    classifications.push(receipt);
+    if (receipt.effectiveRole === "critical") {
+      const error = new Error(`Campaign stopped: task "${task.id}" classified as critical`);
+      error.code = "CAMPAIGN_CRITICAL_CLASSIFICATION";
+      error.classification = receipt;
+      throw error;
+    }
+    tasks.push({
+      ...task,
+      requestedRole: task.role,
+      role: receipt.executionRole,
+      classification: receipt,
+    });
+  }
+  return {
+    plan: { ...plan, tasks },
+    classifications,
+    previewOnly: classifications.some((receipt) => receipt.previewOnly),
+  };
 }
 
 function git(args, cwd, { allowFailure = false } = {}) {
@@ -433,7 +502,8 @@ export async function runCampaign({
   launchWorker,
 }) {
   const planPath = path.resolve(planFile);
-  const plan = validateCampaign(JSON.parse(readFileSync(planPath, "utf8")));
+  const validatedPlan = validateCampaign(JSON.parse(readFileSync(planPath, "utf8")));
+  let plan = validatedPlan;
   const repository = gitRoot(path.resolve(plan.repository));
   assertRepositorySnapshot(repository, plan.base);
   const sourcePath = plan.sourceFile ? resolveCampaignSource(repository, plan.sourceFile) : null;
@@ -441,6 +511,40 @@ export async function runCampaign({
   const config = validateConfig(JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8")));
   if (plan.maxParallel > config.budgets.maxConcurrentWorkers) {
     throw new Error(`Campaign maxParallel exceeds configured worker slots (${config.budgets.maxConcurrentWorkers})`);
+  }
+  const classificationReceiptRoot = path.join(
+    path.resolve(stateRoot),
+    ".codex-factory",
+    "classifications",
+    `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}-${plan.campaignId}`,
+  );
+  const campaignClassification = await classifyCampaignPlan({
+    plan,
+    classification: config.classification,
+    receiptRoot: config.classification?.mode === "off" ? undefined : classificationReceiptRoot,
+  });
+  plan = campaignClassification.plan;
+  if (campaignClassification.previewOnly) {
+    return {
+      campaignId: plan.campaignId,
+      repository,
+      base: plan.base,
+      sourcePath,
+      maxParallel: plan.maxParallel,
+      tasks: plan.tasks.map((task) => ({
+        id: task.id,
+        requestedRole: task.requestedRole,
+        role: task.role,
+        classification: task.classification,
+        dependsOn: task.dependsOn,
+        parallelSafe: task.parallelSafe,
+        attempts: [],
+      })),
+      classifications: campaignClassification.classifications,
+      classificationReceiptRoot,
+      execute: false,
+      previewOnly: true,
+    };
   }
   const ollama = await discoverOllama().catch(() => ({ runtimeVersion: "unavailable", models: [] }));
   const candidates = discoverCandidatePool({ config, ollama });
@@ -467,10 +571,15 @@ export async function runCampaign({
     maxParallel: plan.maxParallel,
     tasks: plan.tasks.map((task) => ({
       id: task.id,
+      requestedRole: task.requestedRole ?? task.role,
+      role: task.role,
+      classification: task.classification ?? null,
       dependsOn: task.dependsOn,
       parallelSafe: task.parallelSafe,
       attempts: ladders[task.id].map(({ provider, model }) => ({ provider, model })),
     })),
+    classifications: campaignClassification.classifications,
+    classificationReceiptRoot: campaignClassification.classifications.length ? classificationReceiptRoot : null,
     execute,
   };
   if (!execute) return preview;

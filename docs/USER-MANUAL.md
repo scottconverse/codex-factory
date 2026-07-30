@@ -135,6 +135,92 @@ Every task requires:
 Workers are leaves. They do not spawn more workers, merge, publish, install, or
 make product decisions.
 
+## Classify a task role
+
+### Owner view
+
+Role classification is optional and disabled by default. With `router: rules`,
+Factory can derive a role from an explicit read/write contract and named risk
+triggers without invoking a model. With `role: auto`:
+
+- `shadow` records the proposed role but is preview-only;
+- `enforce` uses the classified role;
+- `off` rejects the task.
+
+The classifier never grants write access. You or the coordinator must declare
+`accessFamily` and `taskType`; Factory validates them against the bounded paths.
+Any campaign task classified as Critical stops before a candidate is selected.
+
+Preview the tracked example without Python:
+
+```powershell
+npm.cmd run classify:role -- `
+  --task-file examples/classification-task.json `
+  --classification-mode enforce `
+  --receipt-directory .codex-factory/examples/classification
+```
+
+The result explains the deterministic floor, risk triggers, effective role,
+and encoded-task hash. It does not run a worker.
+
+Rules-only auto routing is intentionally conservative: every auto write
+resolves to Critical, even if none of the seven trigger phrases matches.
+Explicit `standard` writes retain the existing operator-reviewed workflow and
+can still be escalated by policy. Auto read tasks can resolve to local-read,
+mechanical, or review.
+
+### Operator view
+
+Single-worker automatic classification uses additive flags:
+
+```powershell
+node scripts/run-worker.mjs `
+  --task-id inspect-repo `
+  --role auto `
+  --classification-mode enforce `
+  --classification-router rules `
+  --access-family read `
+  --task-type inventory `
+  --cwd . `
+  --prompt-file examples/inventory.prompt.md
+```
+
+Campaign `auto` tasks declare `accessFamily` and `taskType` in the plan.
+Classification completes before fleet discovery, attempt ladders, or worker
+slots. Explicit roles remain compatible: shadow preserves the explicit route,
+while enforce mode can only escalate it within the declared permission family.
+
+The optional learned adapter is installed separately:
+
+```powershell
+.\scripts\setup-router.ps1
+```
+
+This creates `.codex-factory/router-venv/` from a hash-locked dependency file
+and runs an offline import smoke test. It does not enable learned routing or
+download a model. No Factory-trained RouteLLM checkpoint is currently shipped.
+Do not substitute RouteLLM's Chatbot Arena thresholds for Factory task
+evidence.
+
+Learned enforce mode requires configured checkpoint and threshold
+fingerprints, a threshold artifact bound to that checkpoint and a reviewed
+dataset, and a recorded zero Critical false-negative count. Inference is local,
+offline, time and output bounded, and fail closed. To uninstall all state
+created by the setup script, close router processes and run from the repository
+root:
+
+```powershell
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue .codex-factory/router-venv
+Remove-Item -Force -ErrorAction SilentlyContinue .codex-factory/router-packages.txt, .codex-factory/router-runtime.json
+```
+
+Operator-installed `.codex-factory/router-models/` checkpoints are preserved;
+remove that directory separately only if the models are no longer needed.
+
+See [Role classification](ROLE-CLASSIFICATION.md) for the complete task schema,
+failure policy, receipt, data rules, calibration metrics, security boundary,
+and RouteLLM attribution.
+
 ## Candidate qualification and role policies
 
 Preview the complete current fleet without invoking a model:
@@ -382,9 +468,15 @@ Edit `factory.config.json` deliberately. Validation requires:
 - known role qualifications, tiers, sandboxes, and reasoning efforts;
 - a token reservation for every configured metered Codex candidate;
 - runtime discovery, rather than a fixed Ollama allowlist.
+- a classification mode of `off`, `shadow`, or `enforce`, a `rules` or
+  `factory_bert` router, bounded input/output and wall time, disabled network
+  inference, ordered review/Critical thresholds, and fail-closed behavior;
+- exact checkpoint and threshold fingerprints before `factory_bert` can be
+  configured.
 
-Adding concurrency, retries, writable local routes, or a new provider changes
-the safety model and requires new tests and design evidence.
+Adding concurrency, retries, writable local routes, a new provider, networked
+classification, or learned enforcement without the reviewed release evidence
+changes the safety model and requires new tests and design evidence.
 
 ## Frequently asked questions
 

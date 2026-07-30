@@ -183,10 +183,15 @@ test("paid run-worker reserves before its fake executable and denial prevents sp
   git(repository, ["commit", "-m", "fixture"]);
   const promptPath = path.join(root, "prompt.txt");
   writeFileSync(promptPath, [
-    "Acceptance criteria: return a receipt.",
-    "Allowed paths: README.md.",
-    "Required checks: none.",
-    "Do not delegate.",
+    "Review the fixture and return the bounded worker receipt.",
+    "Acceptance criteria",
+    "- Return a receipt.",
+    "Allowed paths",
+    "- README.md",
+    "Required checks",
+    "- No additional check.",
+    "Do not delegate",
+    "- Complete this task directly.",
   ].join("\n"));
 
   const before = records(markerPath).length;
@@ -206,6 +211,45 @@ test("paid run-worker reserves before its fake executable and denial prevents sp
     records(markerPath),
   );
 
+  const classifiedConfig = JSON.parse(readFileSync(path.join(root, "factory.config.json"), "utf8"));
+  classifiedConfig.classification.checkExplicitRoles = true;
+  const classifiedConfigPath = path.join(root, "classified.config.json");
+  writeFileSync(classifiedConfigPath, `${JSON.stringify(classifiedConfig)}\n`);
+  const classifiedWorker = run(process.execPath, [
+    path.join(root, "scripts", "run-worker.mjs"),
+    "--task-id", "classified-worker-boundary",
+    "--role", "standard",
+    "--candidate-id", "openai:gpt-5.6-luna",
+    "--cwd", repository,
+    "--prompt-file", promptPath,
+    "--classification-mode", "enforce",
+    "--classification-router", "rules",
+    "--access-family", "write",
+    "--task-type", "implementation",
+    "--config", classifiedConfigPath,
+    "--execute",
+  ], { cwd: root, env: fakeEnvironment(root, markerPath) });
+  assert.equal(classifiedWorker.status, 0, classifiedWorker.stderr || classifiedWorker.stdout);
+  const classifiedResult = JSON.parse(classifiedWorker.stdout);
+  assert.equal(classifiedResult.requestedRole, "standard");
+  assert.equal(classifiedResult.role, "standard");
+  const classificationRoot = path.join(root, ".codex-factory", "classifications");
+  const classificationDirectory = readdirSync(classificationRoot)
+    .find((name) => name.endsWith("-classified-worker-boundary"));
+  assert.ok(classificationDirectory);
+  const classificationReceipt = JSON.parse(readFileSync(path.join(
+    classificationRoot,
+    classificationDirectory,
+    "classification.json",
+  ), "utf8"));
+  assert.equal(classificationReceipt.deterministicFloor, "standard");
+  assert.equal(classificationReceipt.executionRole, "standard");
+  assertReservedThenReconciled(
+    records(path.join(root, ".codex-factory", "usage.jsonl")),
+    "classified-worker-boundary",
+    records(markerPath),
+  );
+
   const deniedConfig = JSON.parse(readFileSync(path.join(root, "factory.config.json"), "utf8"));
   deniedConfig.budgets.aggregatePaidTokens = 1;
   const deniedConfigPath = path.join(root, "denied.config.json");
@@ -222,7 +266,7 @@ test("paid run-worker reserves before its fake executable and denial prevents sp
   ], { cwd: root, env: fakeEnvironment(root, markerPath) });
   assert.notEqual(denied.status, 0);
   assert.match(denied.stderr, /exceeds remaining budget/);
-  assert.equal(records(markerPath).length, before + 1, "denied admission must not spawn");
+  assert.equal(records(markerPath).length, before + 2, "denied admission must not spawn");
 });
 
 test("paid OpenAI smoke reserves each fake process and reconciles both invocations", (context) => {

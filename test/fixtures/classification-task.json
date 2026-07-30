@@ -1,0 +1,22 @@
+{
+  "id": "fixture-task",
+  "requestedRole": "auto",
+  "accessFamily": "write",
+  "taskType": "implementation",
+  "instructions": "Inspect C:\\Users\\scott\\repo and https://private.example/x with API_KEY=topsecret.",
+  "acceptance": [
+    "Return one bounded result."
+  ],
+  "readPaths": [
+    "test/parser.test.mjs",
+    "src/parser.mjs"
+  ],
+  "writePaths": [
+    "src/parser.mjs"
+  ],
+  "checks": [
+    "node --test test/parser.test.mjs"
+  ],
+  "dependencies": 0,
+  "parallelSafe": false
+}

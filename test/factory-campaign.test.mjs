@@ -9,6 +9,7 @@ import {
   validateCampaign,
 } from "../scripts/factory-campaign.mjs";
 import { candidateFingerprint, discoverCandidatePool } from "../scripts/factory-fleet.mjs";
+import { classifyCampaignPlan } from "../scripts/run-campaign.mjs";
 
 function campaign(overrides = {}) {
   return {
@@ -73,6 +74,84 @@ test("validateCampaign accepts a bounded dependency plan and rejects overlapping
   const critical = campaign();
   critical.tasks[0].role = "critical";
   assert.throws(() => validateCampaign(critical), /unsupported campaign task role/i);
+});
+
+test("validateCampaign accepts auto only with explicit access family and task type", () => {
+  const automatic = campaign();
+  automatic.tasks[0].role = "auto";
+  automatic.tasks[0].accessFamily = "write";
+  automatic.tasks[0].taskType = "implementation";
+  assert.equal(validateCampaign(automatic).tasks[0].role, "auto");
+
+  const missingAccess = campaign();
+  missingAccess.tasks[0].role = "auto";
+  missingAccess.tasks[0].taskType = "implementation";
+  assert.throws(() => validateCampaign(missingAccess), /accessFamily/i);
+
+  const mismatched = campaign();
+  mismatched.tasks[0].role = "auto";
+  mismatched.tasks[0].accessFamily = "read";
+  mismatched.tasks[0].taskType = "inventory";
+  assert.throws(() => validateCampaign(mismatched), /read.*writePaths/i);
+});
+
+test("campaign classification completes before ladders and makes auto shadow preview-only", async () => {
+  const automatic = validateCampaign(campaign());
+  automatic.tasks[0].role = "auto";
+  automatic.tasks[0].accessFamily = "read";
+  automatic.tasks[0].taskType = "inventory";
+  automatic.tasks[0].writePaths = [];
+  const classified = await classifyCampaignPlan({
+    plan: automatic,
+    classification: {
+      mode: "shadow",
+      router: "rules",
+      python: ".codex-factory/router-venv/Scripts/python.exe",
+      checkpoint: ".codex-factory/router-models/factory-bert-v1",
+      thresholdSet: "factory-role-thresholds-v1",
+      timeoutSeconds: 20,
+      maxInputBytes: 32768,
+      maxOutputBytes: 16384,
+      reviewThreshold: 0.55,
+      criticalEscalationThreshold: 0.9,
+      onClassifierFailure: "stop",
+      checkExplicitRoles: true,
+      allowNetworkDuringInference: false,
+    },
+  });
+  assert.equal(classified.previewOnly, true);
+  assert.equal(classified.plan.tasks[0].role, null);
+  assert.equal(classified.classifications.length, 3);
+});
+
+test("campaign classification stops on a critical receipt before attempt resolution", async () => {
+  const risky = validateCampaign(campaign());
+  risky.tasks[0].role = "auto";
+  risky.tasks[0].accessFamily = "write";
+  risky.tasks[0].taskType = "implementation";
+  risky.tasks[0].instructions = "Change session-token rotation and update its tests.";
+  risky.tasks[0].writePaths = ["src/auth/session.mjs"];
+  await assert.rejects(
+    classifyCampaignPlan({
+      plan: risky,
+      classification: {
+        mode: "enforce",
+        router: "rules",
+        python: ".codex-factory/router-venv/Scripts/python.exe",
+        checkpoint: ".codex-factory/router-models/factory-bert-v1",
+        thresholdSet: "factory-role-thresholds-v1",
+        timeoutSeconds: 20,
+        maxInputBytes: 32768,
+        maxOutputBytes: 16384,
+        reviewThreshold: 0.55,
+        criticalEscalationThreshold: 0.9,
+        onClassifierFailure: "stop",
+        checkExplicitRoles: true,
+        allowNetworkDuringInference: false,
+      },
+    }),
+    /api.*classified as critical/i,
+  );
 });
 
 test("selectReadyBatch dispatches independent work together and waits for dependencies", () => {

@@ -10,6 +10,7 @@ process tree, and retains selection and execution evidence.
 [Website](https://scottconverse.github.io/codex-factory/) ·
 [User manual](docs/USER-MANUAL.md) ·
 [Architecture](docs/ARCHITECTURE.md) ·
+[Role classification](docs/ROLE-CLASSIFICATION.md) ·
 [Worker model ladder](docs/MODEL-LADDER.md) ·
 [Changelog](CHANGELOG.md)
 
@@ -29,6 +30,11 @@ process tree, and retains selection and execution evidence.
 - lock-scoped aggregate budget admission and durable reservations;
 - wall-clock timeout, interrupt handling, and owned process-tree cleanup;
 - JSONL events, stderr, final-message, result, and usage receipts;
+- opt-in rules-only task-role classification with named Critical risk floors,
+  stable redacted task encoding, and pre-routing receipts;
+- a pinned, isolated RouteLLM adapter and evaluation toolkit for a future
+  Factory-trained classifier; learned routing remains disabled until reviewed
+  data and release gates exist;
 - a direct-Ollama structured patch path that validates model output, writes only
   allowlisted files in an isolated worktree, runs a declared check, and commits
   only on green;
@@ -110,6 +116,12 @@ Local Ollama workers do not have token-spend budgets. Their hard controls are
 wall time, concurrency, attempts, context/output safety, and process cleanup.
 Token counts are retained only as performance telemetry.
 
+Classification is `off` by default. Rules-only shadow and enforce modes are
+available, but no Factory-trained RouteLLM checkpoint is shipped or enabled.
+The classifier cannot grant write access or lower a deterministic Critical
+floor. See [Role classification](docs/ROLE-CLASSIFICATION.md) for the exact
+contract, setup, failure policy, receipts, and learned-router release gate.
+
 ## Website development
 
 The dependency-free static website lives in `site/`.
@@ -141,10 +153,14 @@ Version 0.1.4 publishes the prompt-driven coordinator intake, private campaign
 planning, qualified local-first fallback routing, and the related receipt,
 containment, cleanup, and public-onboarding improvements.
 
+Experimental rules-only auto classification is conservative: auto writes stop
+as Critical; explicit Standard writes preserve the operator-reviewed workflow.
+
 ## Project documents
 
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
+- [Role classification](docs/ROLE-CLASSIFICATION.md)
 - [Worker model ladder](docs/MODEL-LADDER.md)
 - [0.1.4 release notes](docs/RELEASE-NOTES-0.1.4.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
@@ -154,6 +170,14 @@ containment, cleanup, and public-onboarding improvements.
 - [Security policy](SECURITY.md)
 - [Contributing](CONTRIBUTING.md)
 - [License](LICENSE)
+- [RouteLLM attribution and modification notice](third_party/routellm/NOTICE.md)
 
 Copyright © 2026 Scott Converse. Licensed under the
 [Apache License 2.0](LICENSE).
+
+Optional learned routing adapts
+[RouteLLM](https://github.com/lm-sys/RouteLLM), developed by LMSYS Org and
+RouteLLM contributors and released under Apache License 2.0. The upstream
+project and license, all eight paper authors, the exact pinned revision, local
+modifications, and the maintenance fork are retained in the
+[RouteLLM notice](third_party/routellm/NOTICE.md).

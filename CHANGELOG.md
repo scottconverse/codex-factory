@@ -4,6 +4,29 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Additive `accessFamily` and `taskType` contracts, deterministic role policy,
+  named Critical triggers, `role: auto`, off/shadow/enforce modes, and
+  pre-routing classification receipts.
+- Pinned RouteLLM 0.2.0 source, isolated hash-locked Python setup, a
+  Factory-specific sequence-classifier adapter, checkpoint/threshold
+  fingerprint binding, reviewed-dataset validation, calibration, and
+  per-role/per-trigger evaluation tooling.
+- Standalone rules-only `classify:role` workflow and public role-classification
+  documentation.
+
+### Security
+
+- Classifier inference is local, offline, time and output bounded, and
+  fail-closed in enforce mode. Learned classification cannot grant write
+  access or lower deterministic Critical policy.
+- Campaigns stop before candidate selection when classification resolves to
+  Critical.
+
+Learned routing remains disabled by default. No Factory-trained checkpoint or
+claim of validated learned enforcement is included.
+
 ## [0.1.4] - 2026-07-30
 
 ### Added

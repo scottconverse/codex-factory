@@ -14,9 +14,15 @@ const COMMANDS = [
   },
   {
     script: "run-worker.mjs",
-    helpFlags: ["--task-id", "--role", "--cwd", "--prompt-file", "--candidate-id", "--timeout-minutes", "--config", "--execute"],
+    helpFlags: ["--task-id", "--role", "--cwd", "--prompt-file", "--candidate-id", "--timeout-minutes", "--config", "--classification-mode", "--classification-router", "--classification-timeout-seconds", "--access-family", "--task-type", "--execute"],
     valueFlag: "--task-id",
     booleanFlag: "--execute",
+  },
+  {
+    script: "classify-role.mjs",
+    helpFlags: ["--task-file", "--config", "--receipt-directory", "--classification-mode", "--classification-router", "--classification-timeout-seconds"],
+    valueFlag: "--task-file",
+    booleanFlag: "--help",
   },
   {
     script: "run-local-patch.mjs",

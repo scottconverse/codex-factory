@@ -344,6 +344,73 @@ td { color: #d8e5df; font-size: 13px; }
 tbody tr:last-child td { border-bottom: 0; }
 tbody tr:hover { background: rgba(255,255,255,.035); }
 
+.classification-layout {
+  display: grid;
+  grid-template-columns: .92fr 1.08fr;
+  gap: clamp(58px, 8vw, 110px);
+  align-items: center;
+}
+.classification-copy > p:not(.eyebrow) {
+  max-width: 640px;
+  color: var(--muted);
+  font-size: 18px;
+}
+.classification-status {
+  display: grid;
+  gap: 8px;
+  margin: 30px 0 22px;
+  padding: 20px 22px;
+  background: #efd4c5;
+  border-left: 5px solid var(--orange);
+}
+.classification-status strong {
+  color: var(--orange-dark);
+  font: 750 12px/1.4 "Cascadia Code", monospace;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.classification-status span { color: var(--ink); font-size: 14px; line-height: 1.6; }
+.classification-flow {
+  padding: 30px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  box-shadow: 9px 9px 0 rgba(23, 32, 28, .08);
+}
+.flow-node {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 20px;
+  padding: 20px 22px;
+  background: var(--cream);
+  border: 1px solid var(--ink);
+}
+.flow-node span {
+  grid-column: 1 / -1;
+  color: var(--orange-dark);
+  font: 750 11px/1.4 "Cascadia Code", monospace;
+  letter-spacing: .09em;
+}
+.flow-node strong { font-size: 19px; letter-spacing: -.02em; }
+.flow-node small {
+  align-self: center;
+  color: var(--muted);
+  font: 600 11px/1.4 "Cascadia Code", monospace;
+  text-align: right;
+}
+.policy-node { color: var(--cream); background: var(--green); border-color: var(--green); }
+.policy-node span { color: #ef8e68; }
+.policy-node small { color: #aac0b6; }
+.router-node { border-color: var(--orange-dark); }
+.result-node { color: #dce7e1; background: var(--code); border-color: var(--code); }
+.result-node span { color: #ef8e68; }
+.result-node small { color: #9aaca4; }
+.flow-arrow {
+  height: 28px;
+  color: var(--orange-dark);
+  font: 800 18px/28px "Cascadia Code", monospace;
+  text-align: center;
+}
+
 .evidence { display: grid; grid-template-columns: 1fr 1fr; gap: 105px; align-items: center; }
 .receipt-stack { position: relative; min-height: 390px; }
 .receipt-card {
@@ -412,6 +479,13 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
 .footer-grid p { margin: 0; font-size: 13px; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 22px; }
 .footer-links a { min-width: 44px; font-size: 13px; text-underline-offset: 4px; }
+.attribution {
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid #23463b;
+}
+.attribution p { max-width: 900px; margin: 0; color: #8fa69c; font-size: 12px; line-height: 1.65; }
+.attribution a { color: #c5d5ce; text-underline-offset: 3px; }
 .site-header .brand,
 .nav-links > a,
 .text-link,
@@ -424,9 +498,9 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
 }
 
 @media (max-width: 960px) {
-  .hero, .problem-grid, .controls-layout, .routing-layout, .evidence, .quick-layout, .status-intro { grid-template-columns: 1fr; }
+  .hero, .problem-grid, .controls-layout, .routing-layout, .classification-layout, .evidence, .quick-layout, .status-intro { grid-template-columns: 1fr; }
   .hero { padding-top: 68px; }
-  .problem-grid, .controls-layout, .routing-layout, .evidence, .quick-layout, .status-intro { gap: 48px; }
+  .problem-grid, .controls-layout, .routing-layout, .classification-layout, .evidence, .quick-layout, .status-intro { gap: 48px; }
   .factory-line li { grid-template-columns: 75px .8fr 1.2fr; }
   .control-ledger article { grid-template-columns: 110px 1fr; }
   .control-ledger article p { grid-column: 2; }
@@ -488,6 +562,9 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
   .boundary-grid { grid-template-columns: 1fr; }
   .boundary-grid > div + div { border-left: 0; border-top: 1px solid var(--line); }
   .boundary-grid > div { padding: 25px; }
+  .classification-flow { padding: 18px; }
+  .flow-node { grid-template-columns: 1fr; }
+  .flow-node small { text-align: left; }
   .budget-note { grid-template-columns: 1fr; gap: 10px; }
   .footer-grid { grid-template-columns: 1fr; gap: 18px; }
 }

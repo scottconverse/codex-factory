@@ -21,12 +21,16 @@ import {
 } from "./factory-admission.mjs";
 import { superviseProcess } from "./factory-process.mjs";
 import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
+import { classifyFactoryRole, validateClassificationConfig } from "./factory-role-classifier.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const USAGE = `Usage:
   node scripts/run-worker.mjs --task-id <id> --role <role> --cwd <directory>
     --prompt-file <file> [--candidate-id <id>] [--timeout-minutes <minutes>]
-    [--config <file>] [--execute]
+    [--config <file>] [--classification-mode <off|shadow|enforce>]
+    [--classification-router <rules|factory_bert>]
+    [--classification-timeout-seconds <seconds>]
+    [--access-family <read|write>] [--task-type <type>] [--execute]
 
 Options:
   --task-id <id>              Required single-use task identifier.
@@ -36,6 +40,11 @@ Options:
   --candidate-id <id>         Pin an exactly qualified candidate.
   --timeout-minutes <minutes> Bound worker wall-clock time.
   --config <file>             Use an alternate factory configuration.
+  --classification-mode <mode>  Override off, shadow, or enforce mode.
+  --classification-router <id>  Override rules or factory_bert.
+  --classification-timeout-seconds <seconds>  Bound classifier wall-clock time.
+  --access-family <family>    Declare read or write access for classification.
+  --task-type <type>          Declare inventory, mechanical, review, or implementation.
   --execute                   DANGEROUS: launch the selected worker; otherwise dry-run.
   -h, --help                  Show this help.`;
 
@@ -49,6 +58,11 @@ export function parseArgs(argv) {
       "--candidate-id": "candidateId",
       "--timeout-minutes": "timeoutMinutes",
       "--config": "config",
+      "--classification-mode": "classificationMode",
+      "--classification-router": "classificationRouter",
+      "--classification-timeout-seconds": "classificationTimeoutSeconds",
+      "--access-family": "accessFamily",
+      "--task-type": "taskType",
     },
     booleanFlags: { "--execute": "execute" },
     defaults: { execute: false },
@@ -97,7 +111,63 @@ export function validateConfig(config) {
     if (!["low", "medium", "high", "xhigh"].includes(candidate.reasoningEffort)) throw new Error(`Unsupported reasoning effort for ${candidate.model}`);
     if (!Number.isSafeInteger(candidate.tokenReservation) || candidate.tokenReservation <= 0) throw new Error(`Paid candidate ${candidate.model} needs a token reservation`);
   }
+  if (config.classification !== undefined) validateClassificationConfig(config.classification);
   return config;
+}
+
+function sectionLines(prompt, heading, nextHeading) {
+  const normalized = prompt.replace(/\r\n?/g, "\n");
+  const startMarker = `${heading}\n`;
+  const start = normalized.indexOf(startMarker);
+  if (start === -1) throw new Error(`Prompt is missing required marker: ${heading}`);
+  const contentStart = start + startMarker.length;
+  const end = nextHeading ? normalized.indexOf(`\n${nextHeading}\n`, contentStart) : normalized.length;
+  const content = normalized.slice(contentStart, end === -1 ? normalized.length : end);
+  return content.split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => line.replace(/^-\s+/, ""));
+}
+
+function classificationPath(value) {
+  if (typeof value !== "string" || !value || /^[A-Za-z]:[\\/]/.test(value) || value.startsWith("/") || value.startsWith("\\\\")) {
+    throw new Error("Allowed paths must be relative repository paths");
+  }
+  const normalized = value.replaceAll("\\", "/");
+  if (normalized.split("/").some((part) => !part || part === "." || part === "..")) {
+    throw new Error("Allowed paths must be relative repository paths without traversal");
+  }
+  return normalized;
+}
+
+export function buildClassificationTask({
+  taskId,
+  requestedRole,
+  accessFamily,
+  taskType,
+  prompt,
+}) {
+  const normalized = prompt.replace(/\r\n?/g, "\n");
+  const acceptanceIndex = normalized.indexOf("\nAcceptance criteria\n");
+  if (acceptanceIndex < 10) throw new Error("Prompt instructions are incomplete");
+  const instructions = normalized.slice(0, acceptanceIndex).trim();
+  const acceptance = sectionLines(normalized, "Acceptance criteria", "Allowed paths");
+  const allowedPaths = sectionLines(normalized, "Allowed paths", "Required checks").map(classificationPath);
+  const checks = sectionLines(normalized, "Required checks", "Do not delegate");
+  if (!acceptance.length || !allowedPaths.length || !checks.length) throw new Error("Prompt classification sections must not be empty");
+  return {
+    id: taskId,
+    requestedRole,
+    accessFamily,
+    taskType,
+    instructions,
+    acceptance,
+    readPaths: allowedPaths,
+    writePaths: accessFamily === "write" ? allowedPaths : [],
+    checks,
+    dependencies: 0,
+    parallelSafe: false,
+  };
 }
 
 export function resolveRouteCandidate({ config, role, candidates, qualifications, candidateId = null }) {
@@ -193,16 +263,6 @@ export async function main(argv = process.argv.slice(2)) {
   if (!/^[a-z0-9][a-z0-9_-]{0,63}$/.test(options.taskId)) throw new Error("Task ID must use lowercase letters, digits, underscores, or hyphens");
   const configPath = path.resolve(options.config ?? path.join(ROOT, "factory.config.json"));
   const config = validateConfig(JSON.parse(readFileSync(configPath, "utf8")));
-  const ollama = await discoverOllama().catch(() => ({ runtimeVersion: "unavailable", models: [] }));
-  const candidates = discoverCandidatePool({ config, ollama });
-  const qualifications = readJsonLines(path.join(ROOT, ".codex-factory", "qualifications.jsonl"));
-  const route = resolveRouteCandidate({
-    config,
-    role: options.role,
-    candidates,
-    qualifications,
-    candidateId: options.candidateId ?? null,
-  });
   const cwd = path.resolve(options.cwd);
   const promptPath = path.resolve(options.promptFile);
   assertGitRepository(cwd);
@@ -210,6 +270,74 @@ export async function main(argv = process.argv.slice(2)) {
   for (const marker of ["Acceptance criteria", "Allowed paths", "Required checks", "Do not delegate"]) {
     if (!prompt.includes(marker)) throw new Error(`Prompt is missing required marker: ${marker}`);
   }
+  const stateRoot = path.join(ROOT, ".codex-factory");
+  const classification = config.classification
+    ? {
+        ...config.classification,
+        ...(options.classificationMode ? { mode: options.classificationMode } : {}),
+        ...(options.classificationRouter ? { router: options.classificationRouter } : {}),
+        ...(options.classificationTimeoutSeconds
+          ? { timeoutSeconds: Number(options.classificationTimeoutSeconds) }
+          : {}),
+      }
+    : null;
+  if (!classification && (options.role === "auto" || options.classificationMode || options.classificationRouter
+    || options.classificationTimeoutSeconds)) {
+    throw new Error("This Factory configuration does not define classification");
+  }
+  let classificationReceipt = null;
+  let executionRole = options.role;
+  let classificationReceiptDirectory = null;
+  if (classification && (options.role === "auto"
+    || (classification.mode !== "off" && classification.checkExplicitRoles))) {
+    if (!options.accessFamily) throw new Error("Classification requires --access-family");
+    if (!options.taskType) throw new Error("Classification requires --task-type");
+    classificationReceiptDirectory = path.join(
+      stateRoot,
+      "classifications",
+      `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}-${options.taskId}`,
+    );
+    classificationReceipt = await classifyFactoryRole({
+      task: buildClassificationTask({
+        taskId: options.taskId,
+        requestedRole: options.role,
+        accessFamily: options.accessFamily,
+        taskType: options.taskType,
+        prompt,
+      }),
+      classification,
+      receiptDirectory: classificationReceiptDirectory,
+    });
+    executionRole = classificationReceipt.executionRole;
+    if (classificationReceipt.previewOnly) {
+      const preview = {
+        taskId: options.taskId,
+        requestedRole: options.role,
+        role: null,
+        classification: classificationReceipt,
+        classificationReceiptDirectory,
+        command: null,
+        args: [],
+        execute: false,
+        previewOnly: true,
+      };
+      process.stdout.write(`${JSON.stringify(preview, null, 2)}\n`);
+      return preview;
+    }
+  } else if (options.role === "auto") {
+    throw new Error("Role auto requires classification mode shadow or enforce");
+  }
+
+  const ollama = await discoverOllama().catch(() => ({ runtimeVersion: "unavailable", models: [] }));
+  const candidates = discoverCandidatePool({ config, ollama });
+  const qualifications = readJsonLines(path.join(stateRoot, "qualifications.jsonl"));
+  const route = resolveRouteCandidate({
+    config,
+    role: executionRole,
+    candidates,
+    qualifications,
+    candidateId: options.candidateId ?? null,
+  });
   const timeoutMinutes = options.timeoutMinutes === undefined
     ? config.budgets.maxWorkerMinutes
     : Number(options.timeoutMinutes);
@@ -217,7 +345,6 @@ export async function main(argv = process.argv.slice(2)) {
     throw new Error(`--timeout-minutes must be between 1 and ${config.budgets.maxWorkerMinutes}`);
   }
 
-  const stateRoot = path.join(ROOT, ".codex-factory");
   const ledgerPath = path.join(stateRoot, "usage.jsonl");
   const aggregateLimit = route.paid ? config.budgets.aggregatePaidTokens : null;
   const spent = route.paid ? usageSpent(ledgerPath, true) : null;
@@ -227,7 +354,10 @@ export async function main(argv = process.argv.slice(2)) {
   const invocation = buildInvocation({ route, cwd, outputPath: previewOutput });
   const preview = {
     taskId: options.taskId,
-    role: options.role,
+    requestedRole: options.role,
+    role: executionRole,
+    classification: classificationReceipt,
+    classificationReceiptDirectory,
     provider: route.provider,
     model: route.model,
     reasoningEffort: route.reasoningEffort,
@@ -271,14 +401,14 @@ export async function main(argv = process.argv.slice(2)) {
         reservedTokens: route.tokenReservation,
         taskId: options.taskId,
         rejectTaskReuse: true,
-        metadata: { role: options.role, provider: route.provider, model: route.model },
+        metadata: { requestedRole: options.role, role: executionRole, provider: route.provider, model: route.model },
       });
       ({ invocationId, spent: lockedSpent, remaining: lockedRemaining } = admission);
     } else {
       const admission = await reserveUnpaidTaskUsage({
         stateRoot,
         taskId: options.taskId,
-        metadata: { role: options.role, provider: route.provider, model: route.model },
+        metadata: { requestedRole: options.role, role: executionRole, provider: route.provider, model: route.model },
       });
       invocationId = admission.invocationId;
       lockedSpent = null;
@@ -336,7 +466,8 @@ export async function main(argv = process.argv.slice(2)) {
       runId,
       invocationId: invocationId ?? runId,
       taskId: options.taskId,
-      role: options.role,
+      requestedRole: options.role,
+      role: executionRole,
       provider: route.provider,
       model: route.model,
       paid: route.paid,

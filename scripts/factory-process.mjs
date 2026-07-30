@@ -49,6 +49,8 @@ export async function superviseProcess({
   timeoutMs,
   onStdout = () => {},
   onStderr = () => {},
+  maxStdoutBytes = Number.POSITIVE_INFINITY,
+  maxStderrBytes = Number.POSITIVE_INFINITY,
   reapDeadlineMs = 10_000,
   spawnImpl = spawn,
   terminateImpl = terminateProcessTree,
@@ -60,13 +62,9 @@ export async function superviseProcess({
     stdio: ["pipe", "pipe", "pipe"],
     windowsHide: true,
   });
-  child.stdout.on("data", onStdout);
-  child.stderr.on("data", onStderr);
-  child.stdin.on("error", () => {});
-  child.stdin.end(prompt);
-
   let timedOut = false;
   let interrupted = null;
+  let outputLimitError = null;
   let reapTimer;
   let rejectUnreaped;
   const unreaped = new Promise((_, reject) => { rejectUnreaped = reject; });
@@ -88,6 +86,36 @@ export async function superviseProcess({
       }, reapDeadlineMs);
     }
   };
+  const boundedOutput = (stream, callback, limit) => {
+    if (limit !== Number.POSITIVE_INFINITY
+      && (!Number.isSafeInteger(limit) || limit <= 0)) {
+      throw new Error(`${stream} output limit must be a positive integer`);
+    }
+    let received = 0;
+    return (value) => {
+      if (outputLimitError) return;
+      const chunk = Buffer.isBuffer(value) ? value : Buffer.from(value);
+      const remaining = limit - received;
+      if (chunk.length <= remaining) {
+        received += chunk.length;
+        callback(chunk);
+        return;
+      }
+      if (remaining > 0) callback(chunk.subarray(0, remaining));
+      received += chunk.length;
+      const error = new Error(`Process ${stream} exceeded ${limit} bytes`);
+      error.code = "PROCESS_OUTPUT_LIMIT";
+      error.stream = stream;
+      error.limitBytes = limit;
+      error.receivedBytes = received;
+      outputLimitError = error;
+      requestTermination(`${stream}-limit`);
+    };
+  };
+  child.stdout.on("data", boundedOutput("stdout", onStdout, maxStdoutBytes));
+  child.stderr.on("data", boundedOutput("stderr", onStderr, maxStderrBytes));
+  child.stdin.on("error", () => {});
+  child.stdin.end(prompt);
   const onSigint = () => requestTermination("SIGINT");
   const onSigterm = () => requestTermination("SIGTERM");
   signalSource.once("SIGINT", onSigint);
@@ -95,6 +123,7 @@ export async function superviseProcess({
   const timeout = setTimeout(() => requestTermination("timeout"), timeoutMs);
   try {
     const exitCode = await Promise.race([completion, unreaped]);
+    if (outputLimitError) throw outputLimitError;
     return { exitCode, timedOut, interrupted, pid: child.pid ?? null };
   } finally {
     clearTimeout(timeout);

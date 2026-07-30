@@ -1,0 +1,20 @@
+{
+  "id": "inspect-repo",
+  "requestedRole": "auto",
+  "accessFamily": "read",
+  "taskType": "inventory",
+  "instructions": "Inventory the repository entry points and report their responsibilities.",
+  "acceptance": [
+    "Every reported entry point names its repository-relative path."
+  ],
+  "readPaths": [
+    "package.json",
+    "scripts"
+  ],
+  "writePaths": [],
+  "checks": [
+    "No worker or repository write is required for this classification preview."
+  ],
+  "dependencies": 0,
+  "parallelSafe": false
+}

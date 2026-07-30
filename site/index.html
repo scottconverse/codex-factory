@@ -31,6 +31,7 @@
       <div class="nav-links" id="nav-links">
         <a href="#coordinate">Start</a>
         <a href="#workflow">How it works</a>
+        <a href="#classification">Classification</a>
         <a href="#controls">Controls</a>
         <a href="#status">Boundaries</a>
         <a href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md">Manual</a>
@@ -51,7 +52,7 @@
         </div>
         <ul class="hero-facts" aria-label="Operating facts">
           <li><strong>Local first</strong><span>when a free candidate is qualified</span></li>
-          <li><strong>Role scoped</strong><span>a failure does not exile a model</span></li>
+          <li><strong>Policy first</strong><span>permissions never come from a classifier</span></li>
           <li><strong>Once per route</strong><span>fallbacks are previewed up front</span></li>
         </ul>
       </div>
@@ -93,7 +94,7 @@
         <span>Dependency-safe parallelism</span>
         <span>Dry-run by default</span>
         <span>Paid models opt-in</span>
-        <span>Exact candidate fingerprints</span>
+        <span>Classification off by default</span>
         <span>Local token counts are telemetry</span>
       </div>
     </section>
@@ -216,36 +217,77 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
       </div>
     </section>
 
+    <section class="classification shell section" id="classification">
+      <div class="section-tag">05 / Opt-in role classification</div>
+      <div class="classification-layout">
+        <div class="classification-copy">
+          <p class="eyebrow">Rules now · learned routing gated</p>
+          <h2>Let evidence recommend capability. Keep permissions in policy.</h2>
+          <p>Factory can classify a bounded task before candidate selection. Deterministic policy fixes the read/write family and raises named Critical risks. Rules-only auto writes stop as Critical instead of trusting finite keyword coverage; explicit Standard writes remain operator-reviewed. A local RouteLLM adapter may add a calibrated difficulty score, but it cannot grant write access, expand paths, select a provider, or lower a Critical floor.</p>
+          <div class="classification-status" role="note" aria-label="Classification release status">
+            <strong>Ships safely inactive</strong>
+            <span><code>mode: off</code> and <code>router: rules</code> are the checked-in defaults. Learned enforcement still requires a reviewed dataset, a pinned checkpoint and threshold set, and zero Critical false negatives in the acceptance set.</span>
+          </div>
+          <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/ROLE-CLASSIFICATION.md">Read the classification guide <span aria-hidden="true">→</span></a>
+        </div>
+        <div class="classification-flow" aria-label="Factory role classification flow">
+          <div class="flow-node">
+            <span>01 / CONTRACT</span>
+            <strong>read or write</strong>
+            <small>task type · bounded paths · checks</small>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="flow-node policy-node">
+            <span>02 / FACTORY POLICY</span>
+            <strong>permission + risk floor</strong>
+            <small>seven named triggers Â· auto writes stop</small>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="flow-node router-node">
+            <span>03 / OPTIONAL ROUTELLM</span>
+            <strong>difficulty score 0…1</strong>
+            <small>local · offline · fingerprinted</small>
+          </div>
+          <div class="flow-arrow" aria-hidden="true">↓</div>
+          <div class="flow-node result-node">
+            <span>04 / FACTORY COMBINER</span>
+            <strong>effective role</strong>
+            <small>never below deterministic policy</small>
+          </div>
+        </div>
+      </div>
+    </section>
+
     <section class="evidence shell section">
       <div class="receipt-stack" aria-label="Example retained run artifacts">
         <div class="receipt-card request-card">
-          <span>01 / ADMISSION</span>
+          <span>02 / ADMISSION</span>
           <strong>request.json</strong>
           <small>route · scope · reservation</small>
         </div>
         <div class="receipt-card events-card">
-          <span>02 / EXECUTION</span>
+          <span>03 / EXECUTION</span>
           <strong>events.jsonl</strong>
           <small>model events · usage</small>
         </div>
         <div class="receipt-card result-card">
-          <span>03 / TERMINAL</span>
+          <span>04 / TERMINAL</span>
           <strong>result.json</strong>
           <small>exit · cleanup · disposition</small>
         </div>
       </div>
       <div class="evidence-copy">
-        <div class="section-tag">05 / Receipts</div>
+        <div class="section-tag">06 / Receipts</div>
         <p class="eyebrow">Evidence survives the shift</p>
         <h2>Enough context to accept, reject, or investigate.</h2>
-        <p>Each run retains the exact request, JSONL events, stderr diagnostics, final message, terminal result, and aggregate usage record. Raw receipts remain local and ignored by Git because they can contain repository data.</p>
+        <p>Classification writes its decision before routing, including the deterministic floor, matched risk triggers, encoded-task hash, effective role, and exact router artifacts. Each run then retains the request, JSONL events, diagnostics, final message, terminal result, and aggregate usage record. Raw receipts stay local and ignored by Git because they can contain repository data.</p>
         <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md#understand-results">Understand the artifacts <span aria-hidden="true">→</span></a>
       </div>
     </section>
 
     <section class="quick-start section" id="quick-start">
       <div class="shell">
-        <div class="section-tag light-tag">06 / First shift</div>
+        <div class="section-tag light-tag">07 / First shift</div>
         <div class="quick-layout">
           <div>
             <p class="eyebrow">Node.js 24+ · Git · Codex CLI</p>
@@ -277,7 +319,7 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
     </section>
 
     <section class="status shell section" id="status">
-      <div class="section-tag">07 / Honest boundary</div>
+      <div class="section-tag">08 / Honest boundary</div>
       <div class="status-intro">
         <div>
           <p class="eyebrow">Evidence-producing prototype</p>
@@ -294,6 +336,7 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
             <li>Free-local-first selection from the qualified pool</li>
             <li>Constrained local structured-file patch path</li>
             <li>Owned process tree per worker, with three configured slots, timeout, and receipts</li>
+            <li>Rules-only shadow and opt-in auto-role enforcement, with classification receipts</li>
           </ul>
         </div>
         <div class="boundary-not">
@@ -303,6 +346,7 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
             <li>Automatic semantic acceptance, merge, or release</li>
             <li>MCP server or autonomous repository-wide local agents</li>
             <li>Hard token cutoff during a Codex turn</li>
+            <li>A released Factory-trained RouteLLM checkpoint or enabled learned enforcement</li>
           </ul>
         </div>
       </div>
@@ -339,7 +383,11 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
         <a href="https://github.com/scottconverse/codex-factory/releases">Releases</a>
         <a href="https://github.com/scottconverse/codex-factory/blob/main/SECURITY.md">Security</a>
         <a href="https://github.com/scottconverse/codex-factory/blob/main/LICENSE">License</a>
+        <a href="https://github.com/scottconverse/codex-factory/blob/main/third_party/routellm/NOTICE.md">RouteLLM attribution</a>
       </div>
+    </div>
+    <div class="shell attribution">
+      <p>Optional learned routing adapts <a href="https://github.com/lm-sys/RouteLLM">RouteLLM</a> by LMSYS Org at pinned Apache-2.0 source. The upstream project and license, all eight paper authors, Factory-specific changes, and update history are retained in the <a href="https://github.com/scottconverse/codex-factory/blob/main/third_party/routellm/NOTICE.md">third-party notice</a>.</p>
     </div>
   </footer>
 </body>

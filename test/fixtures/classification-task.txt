@@ -1,0 +1,17 @@
+[FACTORY_TASK_V1]
+encoder_version: 1
+operation: write
+task_type: implementation
+instructions:
+Inspect [ABSOLUTE_PATH] and [URL] with API_KEY=[REDACTED]
+acceptance:
+- Return one bounded result.
+read_paths:
+- src/parser.mjs
+- test/parser.test.mjs
+write_paths:
+- src/parser.mjs
+checks:
+- node --test test/parser.test.mjs
+dependencies: 0
+parallel_safe: false

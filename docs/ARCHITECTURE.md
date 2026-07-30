@@ -23,6 +23,7 @@ Campaign runner
 Runner preflight
     |-- validate configuration and prompt contract
     |-- confirm Git repository
+    |-- classify task before candidate discovery/selection (when enabled)
     |-- preview exact provider/model/sandbox command
     v
 Worker-slot and ledger locks
@@ -61,6 +62,56 @@ Task JSON + declared context
 `factory.config.json` is the operator-controlled routing and budget policy.
 Provider/accounting mismatches are rejected.
 
+### Role classification boundary
+
+`scripts/factory-role-policy.mjs` normalizes the additive task contract and
+owns read/write access, deterministic role floors, and named Critical risk
+triggers. `scripts/factory-role-classifier.mjs` owns stable redacted encoding,
+the bounded Python child process, strict response validation, role combination,
+and `classification.json`.
+
+```text
+bounded task contract
+    |-- accessFamily + taskType + paths
+    v
+Factory deterministic policy
+    |-- permission family
+    |-- minimum role
+    |-- named Critical triggers
+    +-----------------------------+
+                                  |
+optional local RouteLLM adapter   |
+    |-- difficulty score          |
+    |-- checkpoint fingerprint    |
+    |-- threshold fingerprint     |
+    +-----------------------------+
+                                  v
+                         Factory role combiner
+                                  |
+                                  v
+                    existing qualification + selector
+```
+
+Rules-only mode has no Python dependency. The optional learned path invokes
+`python -m codex_factory_router.adapter` once with a bounded JSON request.
+Inference runs from `.codex-factory/router-venv/`, sets supported Hugging Face
+libraries offline, installs a Python audit hook that denies socket operations,
+and has no shell or repository tools. The shared process supervisor enforces
+wall time plus stdout/stderr limits and owns cleanup.
+
+The learned response is accepted only when its schema, task ID, RouteLLM
+revision, checkpoint fingerprint, threshold fingerprint, threshold values, and
+score all match configuration. Threshold JSON is stored below the checkpoint
+but excluded from the model fingerprint to avoid a circular digest; the
+threshold record separately binds itself to that model fingerprint and its
+reviewed dataset fingerprint.
+
+Classification precedes candidate discovery, attempt-ladder construction, and
+worker-slot acquisition. It may escalate capability but cannot change the
+permission family or lower the deterministic floor. Campaigns stop on any
+Critical classification. No Factory-trained checkpoint is currently shipped,
+so learned enforcement remains gated; the checked-in mode is `off`.
+
 ### Campaign coordinator and supervisor
 
 `scripts/coordinator-intake.mjs` is the boundary between an owner request and
@@ -97,10 +148,11 @@ embedding-only inventory remains visible but is not treated as a subagent.
 ### Durable local state
 
 `.codex-factory/` contains worker slots, an append-only usage ledger, campaign
-receipts, qualification run bundles, and per-run evidence. Campaign acceptance
-checks use the same owned process-tree supervisor as model execution and retain
-their own check receipt. A dead-PID slot or ledger lock is reclaimed only
-by a later acquisition; live owners are never removed. The directory is
+receipts, classification receipts, the optional router environment and
+checkpoints, qualification run bundles, and per-run evidence. Campaign
+acceptance checks use the same owned process-tree supervisor as model execution
+and retain their own check receipt. A dead-PID slot or ledger lock is reclaimed
+only by a later acquisition; live owners are never removed. The directory is
 intentionally outside version control.
 
 ### Operator skill
@@ -122,12 +174,22 @@ coordinate the owner request. That selected model is the coordinator.
 - Terminal usage events are trusted for accounting because no in-turn usage
   signal is currently exposed.
 - Local token counts are telemetry, not financial admission controls.
+- The task contract grants access; learned classification cannot grant write
+  access, expand scope, choose a provider, or lower a policy floor.
+- RouteLLM source and dependencies are pinned third-party code. Locally
+  downloaded checkpoints are third-party executable data and require explicit
+  fingerprints before learned routing can be configured.
 
 ## Failure policy
 
 The system fails closed where evidence is missing:
 
 - an invalid task contract prevents launch;
+- an auto role in off mode, a declaration conflict, or an unavailable learned
+  classifier in enforce mode prevents candidate selection;
+- classifier timeout, excess output, nonzero exit, malformed JSON, or artifact
+  mismatch prevents candidate selection;
+- a campaign task classified as Critical prevents campaign dispatch;
 - tracked owner changes prevent coordinator intake, so an isolated campaign
   cannot silently omit or overwrite uncommitted work;
 - all live worker slots prevent launch;

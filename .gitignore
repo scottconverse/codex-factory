@@ -1,6 +1,9 @@
 .codex-factory/
 node_modules/
 *.log
+__pycache__/
+*.py[cod]
+*.egg-info/
 dist/
 .env
 .env.*

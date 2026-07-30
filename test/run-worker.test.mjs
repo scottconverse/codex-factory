@@ -3,13 +3,80 @@ import test from "node:test";
 import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { buildInvocation, classifyResult, parseArgs, resolveRouteCandidate, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
+import { buildClassificationTask, buildInvocation, classifyResult, parseArgs, resolveRouteCandidate, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
 import { buildSmokeInvocation, validateSmokeArtifact, workersOverlap } from "../scripts/fleet-smoke.mjs";
 import { candidateFingerprint, discoverCandidatePool } from "../scripts/factory-fleet.mjs";
 
 test("parseArgs keeps execution opt-in", () => {
   assert.deepEqual(parseArgs(["--task-id", "one", "--role", "mechanical"]), { taskId: "one", role: "mechanical", execute: false });
   assert.equal(parseArgs(["--execute"]).execute, true);
+  assert.deepEqual(
+    parseArgs([
+      "--classification-mode", "enforce",
+      "--classification-router", "rules",
+      "--classification-timeout-seconds", "12",
+      "--access-family", "write",
+      "--task-type", "implementation",
+    ]),
+    {
+      classificationMode: "enforce",
+      classificationRouter: "rules",
+      classificationTimeoutSeconds: "12",
+      accessFamily: "write",
+      taskType: "implementation",
+      execute: false,
+    },
+  );
+});
+
+test("single-worker prompt builds a bounded structured classification contract", () => {
+  const prompt = `Implement the parser fix.
+
+Acceptance criteria
+- Quoted delimiters remain inside one field.
+
+Allowed paths
+- src/parser.mjs
+- test/parser.test.mjs
+
+Required checks
+- node --test test/parser.test.mjs
+
+Do not delegate
+- Complete this directly.
+`;
+  assert.deepEqual(
+    buildClassificationTask({
+      taskId: "fix-parser",
+      requestedRole: "auto",
+      accessFamily: "write",
+      taskType: "implementation",
+      prompt,
+    }),
+    {
+      id: "fix-parser",
+      requestedRole: "auto",
+      accessFamily: "write",
+      taskType: "implementation",
+      instructions: "Implement the parser fix.",
+      acceptance: ["Quoted delimiters remain inside one field."],
+      readPaths: ["src/parser.mjs", "test/parser.test.mjs"],
+      writePaths: ["src/parser.mjs", "test/parser.test.mjs"],
+      checks: ["node --test test/parser.test.mjs"],
+      dependencies: 0,
+      parallelSafe: false,
+    },
+  );
+  assert.throws(
+    () => buildClassificationTask({
+      taskId: "fix-parser",
+      requestedRole: "auto",
+      accessFamily: "write",
+      taskType: "implementation",
+      prompt: prompt.replace("- src/parser.mjs", "- C:\\private\\parser.mjs"),
+    }),
+    /relative repository path/i,
+  );
 });
 
 test("validateConfig permits bounded concurrency and rejects retry or fleet expansion", () => {

@@ -32,6 +32,21 @@
       }
     ]
   },
+  "classification": {
+    "mode": "off",
+    "router": "rules",
+    "python": ".codex-factory/router-venv/Scripts/python.exe",
+    "checkpoint": ".codex-factory/router-models/factory-bert-v1",
+    "thresholdSet": "factory-role-thresholds-v1",
+    "timeoutSeconds": 20,
+    "maxInputBytes": 32768,
+    "maxOutputBytes": 16384,
+    "reviewThreshold": 0.55,
+    "criticalEscalationThreshold": 0.9,
+    "onClassifierFailure": "stop",
+    "checkExplicitRoles": true,
+    "allowNetworkDuringInference": false
+  },
   "routes": {
     "mechanical": {
       "qualificationRole": "analysis",

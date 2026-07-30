@@ -36,8 +36,27 @@ Do not include live API keys, authentication tokens, or private run artifacts.
 - Bootstrap accepts only an explicit destination that does not already exist.
 - Direct local writes are restricted to task-declared allowlisted files; the
   supervisor applies model-proposed content and runs the declared check.
+- Classification is disabled by default. The task contract—not RouteLLM—grants
+  read or write access. Classification cannot expand paths or lower a named
+  Critical risk floor.
+- Optional RouteLLM inference uses a project-local Python environment, offline
+  library settings, a socket-denying Python audit hook, bounded input and
+  output, an owned process tree, and pinned checkpoint and threshold
+  fingerprints. It receives encoded task metadata, not repository file
+  contents.
+- Learned enforce mode fails closed on classifier timeout, process failure,
+  malformed output, revision or fingerprint mismatch, threshold mismatch,
+  out-of-range scores, or a nonzero recorded Critical false-negative metric.
+- Router checkpoints are third-party executable data. Download and inspect
+  them during setup, keep them in ignored local state, and never enable learned
+  enforcement from an unreviewed or mutable checkpoint.
 - Raw worker receipts may contain repository content and should not be
   published without review.
+
+Classification receipts and Python diagnostics can contain owner instructions
+or local paths after a failure. Treat them with the same care as worker
+receipts. See [`docs/ROLE-CLASSIFICATION.md`](docs/ROLE-CLASSIFICATION.md) for
+the classifier trust boundary and artifact contract.
 
 Architecture and current trust boundaries are documented in
 [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Reports about concurrency,

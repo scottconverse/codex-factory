@@ -1,7 +1,7 @@
 import { selectCandidate } from "./factory-fleet.mjs";
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,47}$/;
-const ROLES = new Set(["mechanical", "standard", "review", "critical", "local-read"]);
+const ROLES = new Set(["auto", "mechanical", "standard", "review", "critical", "local-read"]);
 const PLAIN_EXECUTABLE_PATTERN = /^(?:[A-Za-z]:\\[^&|<>\r\n]+|\/[^&|<>\r\n]+|[A-Za-z0-9._-]+)$/;
 
 function normalizePath(value, label) {
@@ -65,13 +65,31 @@ export function validateCampaign(value) {
     if (ids.has(task.id)) throw new Error(`Duplicate campaign task ID: ${task.id}`);
     ids.add(task.id);
     if (!ROLES.has(task.role) || task.role === "critical") throw new Error(`Unsupported campaign task role: ${task.role}`);
+    if (task.role === "auto") {
+      if (!["read", "write"].includes(task.accessFamily)) throw new Error(`Task ${task.id} accessFamily must be read or write for role auto`);
+      if (!["inventory", "mechanical", "review", "implementation"].includes(task.taskType)) {
+        throw new Error(`Task ${task.id} taskType is invalid for role auto`);
+      }
+      if (task.accessFamily === "read" && !["inventory", "mechanical", "review"].includes(task.taskType)) {
+        throw new Error(`Task ${task.id} taskType conflicts with read accessFamily`);
+      }
+      if (task.accessFamily === "write" && task.taskType !== "implementation") {
+        throw new Error(`Task ${task.id} taskType conflicts with write accessFamily`);
+      }
+    }
     if (typeof task.instructions !== "string" || task.instructions.trim().length < 10) {
       throw new Error(`Task ${task.id} instructions are incomplete`);
     }
     if (!Array.isArray(task.readPaths) || task.readPaths.length === 0) throw new Error(`Task ${task.id} needs readPaths`);
-    if (!Array.isArray(task.writePaths) || task.writePaths.length === 0) throw new Error(`Task ${task.id} needs writePaths`);
+    if (!Array.isArray(task.writePaths)
+      || (task.writePaths.length === 0 && !(task.role === "auto" && task.accessFamily === "read"))) {
+      throw new Error(`Task ${task.id} needs writePaths`);
+    }
     task.readPaths = [...new Set(task.readPaths.map((entry) => normalizePath(entry, `Task ${task.id} read path`)))];
     task.writePaths = [...new Set(task.writePaths.map((entry) => normalizePath(entry, `Task ${task.id} write path`)))];
+    if (task.role === "auto" && task.accessFamily === "read" && task.writePaths.length) {
+      throw new Error(`Task ${task.id} read accessFamily cannot declare writePaths`);
+    }
     if (!Array.isArray(task.dependsOn)) throw new Error(`Task ${task.id} dependsOn must be an array`);
     if (typeof task.parallelSafe !== "boolean") throw new Error(`Task ${task.id} must declare parallelSafe`);
     if (typeof task.check?.command !== "string" || !PLAIN_EXECUTABLE_PATTERN.test(task.check.command)) {
