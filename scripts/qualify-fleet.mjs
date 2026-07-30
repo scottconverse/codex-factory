@@ -262,10 +262,19 @@ function initializeWriteFixture(root) {
   spawnSync("git", ["commit", "-qm", "fixture"], { cwd: root, windowsHide: true });
 }
 
+export function removeQualificationFixture(fixture, removeImpl = rmSync) {
+  removeImpl(fixture, {
+    recursive: true,
+    force: true,
+    maxRetries: 3,
+    retryDelay: 50,
+  });
+}
+
 export async function withQualificationFixture(
   createFixture,
   operation,
-  removeFixture = (fixture) => rmSync(fixture, { recursive: true, force: true }),
+  removeFixture = removeQualificationFixture,
 ) {
   const fixture = createFixture();
   let primaryError = null;

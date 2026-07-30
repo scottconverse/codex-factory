@@ -7,6 +7,7 @@ import {
   evaluateLocalQualification,
   filterQualificationPlan,
   parseQualificationArgs,
+  removeQualificationFixture,
   withQualificationFixture,
 } from "../scripts/qualify-fleet.mjs";
 
@@ -69,6 +70,22 @@ test("local qualification evaluates exact role artifacts", () => {
     }).passed,
     false,
   );
+});
+
+test("qualification fixture cleanup uses bounded Windows-friendly retries", () => {
+  let observed = null;
+  removeQualificationFixture("fixture", (fixture, options) => {
+    observed = { fixture, options };
+  });
+  assert.deepEqual(observed, {
+    fixture: "fixture",
+    options: {
+      recursive: true,
+      force: true,
+      maxRetries: 3,
+      retryDelay: 50,
+    },
+  });
 });
 
 test("paid qualification removes its temporary fixture when supervision throws", async (context) => {
