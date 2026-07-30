@@ -15,10 +15,25 @@ test("ollamaBaseUrl accepts an explicit operator endpoint and rejects malformed 
     ollamaBaseUrl({ CODEX_FACTORY_TEST_OLLAMA_URL: "http://127.0.0.1:32100/" }),
     "http://127.0.0.1:32100",
   );
+  assert.equal(
+    ollamaBaseUrl({ CODEX_FACTORY_TEST_OLLAMA_URL: " \thttp://[::1]:11434/base/ \r\n" }),
+    "http://[::1]:11434/base",
+  );
   assert.throws(
     () => ollamaBaseUrl({ CODEX_FACTORY_TEST_OLLAMA_URL: "not a URL" }),
     /valid HTTP URL/,
   );
+  for (const value of [
+    "ftp://127.0.0.1:11434",
+    "http://user:pass@127.0.0.1:11434",
+    "http://127.0.0.1:11434?query=1",
+    "http://127.0.0.1:11434/#fragment",
+  ]) {
+    assert.throws(
+      () => ollamaBaseUrl({ CODEX_FACTORY_TEST_OLLAMA_URL: value }),
+      /valid HTTP URL/,
+    );
+  }
 });
 
 const config = {

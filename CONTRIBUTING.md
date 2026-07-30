@@ -24,7 +24,7 @@ Requirements:
 Run the repository checks:
 
 ```powershell
-npm.cmd run check
+npm.cmd run verify
 ```
 
 Build and validate the website:

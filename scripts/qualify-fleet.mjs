@@ -206,8 +206,33 @@ function initializeWriteFixture(root) {
   spawnSync("git", ["commit", "-qm", "fixture"], { cwd: root, windowsHide: true });
 }
 
+export async function withQualificationFixture(
+  createFixture,
+  operation,
+  removeFixture = (fixture) => rmSync(fixture, { recursive: true, force: true }),
+) {
+  const fixture = createFixture();
+  let primaryError = null;
+  try {
+    return await operation(fixture);
+  } catch (error) {
+    primaryError = error;
+    throw error;
+  } finally {
+    try {
+      removeFixture(fixture);
+    } catch (cleanupError) {
+      if (!primaryError) throw cleanupError;
+      primaryError.message = `${primaryError.message}; qualification fixture cleanup failed: ${cleanupError.message}`;
+      primaryError.cleanupError = cleanupError.message;
+    }
+  }
+}
+
 async function qualifyCodex(item, timeoutMs, receiptPath) {
-  const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-qualification-"));
+  return withQualificationFixture(
+    () => mkdtempSync(path.join(os.tmpdir(), "codex-factory-qualification-")),
+    async (fixture) => {
   const outputPath = path.join(fixture, "last-message.txt");
   if (item.role === "workspace_write") initializeWriteFixture(fixture);
   const prompt = item.role === "analysis"
@@ -286,8 +311,9 @@ async function qualifyCodex(item, timeoutMs, receiptPath) {
   };
   writeFileSync(path.join(receiptPath, "last-message.txt"), `${finalMessage}\n`);
   writeFileSync(path.join(receiptPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
-  rmSync(fixture, { recursive: true, force: true });
   return result;
+    },
+  );
 }
 
 function readJsonLines(filename) {

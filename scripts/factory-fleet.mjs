@@ -94,7 +94,7 @@ export function parseOllamaDiscovery(versionPayload, tagsPayload) {
 }
 
 export function ollamaBaseUrl(env = process.env) {
-  const configured = env.CODEX_FACTORY_TEST_OLLAMA_URL ?? "http://127.0.0.1:11434";
+  const configured = (env.CODEX_FACTORY_TEST_OLLAMA_URL ?? "http://127.0.0.1:11434").trim();
   let parsed;
   try {
     parsed = new URL(configured);

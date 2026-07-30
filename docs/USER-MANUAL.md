@@ -43,7 +43,7 @@ Clone the repository and verify it:
 ```powershell
 git clone https://github.com/scottconverse/codex-factory.git
 cd codex-factory
-npm.cmd run check
+npm.cmd run verify
 ```
 
 No npm dependencies are required for the runner.

@@ -13,6 +13,8 @@
 | Durable campaigns and dependency graph | Factory campaign plan and isolated integration worktree | Implemented locally |
 | Product-owner approval policy | Prompts, permissions, hooks, skills | Evaluate |
 | Cross-provider qualification history | Partial provider/model configuration | Likely differentiated |
-| PM-facing Control Room | Desktop task/subagent views are partial | Evaluate |
+| PM-facing Control Room | Desktop task/subagent views are partial | Out of current scope; requires a new explicit product decision and safety evidence |
 
 The bakeoff must replace assumptions in this table with execution receipts.
+The current product scope is the bounded coordinator/worker supervisor only;
+historical platform options are not active roadmap commitments.

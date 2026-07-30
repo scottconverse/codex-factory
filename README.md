@@ -42,7 +42,7 @@ candidate discovery and qualification.
 ```powershell
 git clone https://github.com/scottconverse/codex-factory.git
 cd codex-factory
-npm.cmd run check
+npm.cmd run verify
 ```
 
 Open this checkout as the workspace for a new top-level Codex task. Tell the

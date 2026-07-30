@@ -24,3 +24,18 @@ if (menuButton && navLinks) {
     }
   });
 }
+
+const copyPromptButton = document.querySelector(".copy-prompt");
+const copyStatus = document.querySelector(".copy-status");
+
+if (copyPromptButton && copyStatus) {
+  copyPromptButton.addEventListener("click", async () => {
+    const prompt = document.getElementById(copyPromptButton.dataset.copyTarget);
+    try {
+      await navigator.clipboard.writeText(prompt.textContent);
+      copyStatus.textContent = "Coordinator prompt copied.";
+    } catch {
+      copyStatus.textContent = "Copy failed. Select the prompt manually.";
+    }
+  });
+}

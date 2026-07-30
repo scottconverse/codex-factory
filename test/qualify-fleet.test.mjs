@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   evaluateLocalQualification,
   filterQualificationPlan,
   parseQualificationArgs,
+  withQualificationFixture,
 } from "../scripts/qualify-fleet.mjs";
 
 test("qualification defaults to every candidate and keeps execution explicit", () => {
@@ -64,5 +68,68 @@ test("local qualification evaluates exact role artifacts", () => {
       }),
     }).passed,
     false,
+  );
+});
+
+test("paid qualification removes its temporary fixture when supervision throws", async (context) => {
+  const parent = mkdtempSync(path.join(os.tmpdir(), "factory-qualification-cleanup-"));
+  context.after(() => rmSync(parent, { recursive: true, force: true }));
+  const fixture = path.join(parent, "fixture");
+  const receiptPath = path.join(parent, "receipt");
+  const failure = Object.assign(new Error("child was not reaped"), {
+    code: "PROCESS_NOT_REAPED",
+    childPid: 123,
+    processGroup: 123,
+  });
+  await assert.rejects(
+    withQualificationFixture(
+      () => {
+        mkdirSync(fixture);
+        return fixture;
+      },
+      async () => { throw failure; },
+    ),
+    (error) => error === failure,
+  );
+  assert.equal(existsSync(fixture), false);
+});
+
+test("paid qualification removes its temporary fixture after success", async (context) => {
+  const parent = mkdtempSync(path.join(os.tmpdir(), "factory-qualification-success-"));
+  context.after(() => rmSync(parent, { recursive: true, force: true }));
+  const fixture = path.join(parent, "fixture");
+  const result = await withQualificationFixture(
+    () => {
+      mkdirSync(fixture);
+      return fixture;
+    },
+    async () => "accepted",
+  );
+  assert.equal(result, "accepted");
+  assert.equal(existsSync(fixture), false);
+});
+
+test("paid qualification preserves its primary error when fixture cleanup also fails", async () => {
+  const failure = Object.assign(new Error("child was not reaped"), { code: "PROCESS_NOT_REAPED" });
+  await assert.rejects(
+    withQualificationFixture(
+      () => "fixture",
+      async () => { throw failure; },
+      () => { throw new Error("access denied"); },
+    ),
+    (error) => error === failure
+      && error.cleanupError === "access denied"
+      && /fixture cleanup failed/.test(error.message),
+  );
+});
+
+test("paid qualification surfaces a cleanup failure after successful work", async () => {
+  await assert.rejects(
+    withQualificationFixture(
+      () => "fixture",
+      async () => "accepted",
+      () => { throw new Error("access denied"); },
+    ),
+    /access denied/,
   );
 });

@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   analyzeSubprocessCoverage,
@@ -12,6 +13,14 @@ function profile(filename, functions) {
       functions,
     }],
   };
+}
+
+function allowed(filename, source, url = `file:///tmp/factory/scripts/${filename}`) {
+  return [{
+    filename,
+    url,
+    digest: createHash("sha256").update(source).digest("hex"),
+  }];
 }
 
 test("subprocess coverage honors nested zero-count ranges and unions separate processes", () => {
@@ -30,10 +39,21 @@ test("subprocess coverage honors nested zero-count ranges and unions separate pr
       { startOffset: 4, endOffset: 7, count: 1 },
     ],
   }]);
-  const partial = analyzeSubprocessCoverage({ profiles: [first], filename: "runner.mjs", source });
+  const allowedSources = allowed("runner.mjs", source);
+  const partial = analyzeSubprocessCoverage({
+    profiles: [first],
+    filename: "runner.mjs",
+    source,
+    allowedSources,
+  });
   assert.equal(partial.coveredLines, 1);
   assert.equal(partial.totalLines, 2);
-  const union = analyzeSubprocessCoverage({ profiles: [first, second], filename: "runner.mjs", source });
+  const union = analyzeSubprocessCoverage({
+    profiles: [first, second],
+    filename: "runner.mjs",
+    source,
+    allowedSources,
+  });
   assert.equal(union.coveredLines, 2);
 });
 
@@ -57,6 +77,7 @@ test("subprocess coverage unions named function execution and enforces both floo
     profiles: [profile("runner.mjs", ranges(1, 0)), profile("runner.mjs", ranges(0, 1))],
     filename: "runner.mjs",
     source,
+    allowedSources: allowed("runner.mjs", source),
   });
   assert.equal(metrics.coveredFunctions, 2);
   assert.equal(metrics.totalFunctions, 2);
@@ -64,5 +85,31 @@ test("subprocess coverage unions named function execution and enforces both floo
   assert.throws(
     () => enforceThresholds({ ...metrics, functions: 99 }, { lines: 100, functions: 100 }, "runner.mjs"),
     /functions coverage/,
+  );
+});
+
+test("subprocess coverage rejects foreign URLs and stale source digests", () => {
+  const source = "function real() { return 1; }\n";
+  const functions = [{
+    functionName: "",
+    ranges: [{ startOffset: 0, endOffset: source.length, count: 1 }],
+  }];
+  assert.throws(
+    () => analyzeSubprocessCoverage({
+      profiles: [profile("runner.mjs", functions)],
+      filename: "runner.mjs",
+      source,
+      allowedSources: allowed("runner.mjs", source, "file:///other/scripts/runner.mjs"),
+    }),
+    /No subprocess coverage found/,
+  );
+  assert.throws(
+    () => analyzeSubprocessCoverage({
+      profiles: [profile("runner.mjs", functions)],
+      filename: "runner.mjs",
+      source,
+      allowedSources: allowed("runner.mjs", "stale source"),
+    }),
+    /No source-authenticated subprocess manifest entries/,
   );
 });

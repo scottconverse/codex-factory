@@ -107,7 +107,11 @@
         </div>
         <div class="problem-copy">
           <p>Open the Factory checkout in a top-level Codex task. Paste this prompt, fill in the target and request fields, and continue in that task:</p>
-          <pre class="coordinator-prompt" aria-label="Copyable coordinator prompt"><code>Read and follow skills/codex-factory/SKILL.md completely.
+          <div class="prompt-actions">
+            <button class="copy-prompt" type="button" data-copy-target="coordinator-prompt-text">Copy prompt</button>
+            <span class="copy-status" role="status" aria-live="polite"></span>
+          </div>
+          <pre class="coordinator-prompt" aria-label="Copyable coordinator prompt"><code id="coordinator-prompt-text">Read and follow skills/codex-factory/SKILL.md completely.
 Target repository: &lt;absolute path to the existing repository or new destination&gt;
 Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre>
           <p>The coordinator inspects an existing clean repository or bootstraps one explicit new destination, creates <code>campaign.json</code> privately, previews bounded routes, runs only authorized workers, integrates accepted commits, and returns evidence for your review. You never author Factory JSON.</p>
@@ -253,7 +257,7 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
             <div class="terminal-bar"><span></span><span></span><span></span><b>PowerShell</b></div>
             <pre><code><span class="prompt">&gt;</span> git clone https://github.com/scottconverse/codex-factory.git
 <span class="prompt">&gt;</span> cd codex-factory
-<span class="prompt">&gt;</span> npm.cmd run check
+<span class="prompt">&gt;</span> npm.cmd run verify
 
 <span class="comment"># Preview candidate × harness plan</span>
 <span class="prompt">&gt;</span> npm.cmd run fleet:qualify

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { spawn, spawnSync } from "node:child_process";
 import {
+  appendFileSync,
   cpSync,
   existsSync,
   mkdtempSync,
@@ -14,6 +16,7 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import test from "node:test";
+import { pathToFileURL } from "node:url";
 import { superviseProcess } from "../scripts/factory-process.mjs";
 
 const PROJECT = path.resolve(import.meta.dirname, "..");
@@ -39,6 +42,17 @@ function isolatedFactory() {
   cpSync(path.join(PROJECT, "scripts"), path.join(root, "scripts"), { recursive: true });
   for (const name of ["package.json", "factory.config.json"]) cpSync(path.join(PROJECT, name), path.join(root, name));
   mkdirSync(path.join(root, ".codex-factory"), { recursive: true });
+  const coverageManifest = process.env.CODEX_FACTORY_COVERAGE_MANIFEST;
+  if (coverageManifest) {
+    for (const filename of ["run-worker.mjs", "qualify-fleet.mjs", "fleet-smoke.mjs", "run-local-patch.mjs"]) {
+      const target = path.join(root, "scripts", filename);
+      appendFileSync(coverageManifest, `${JSON.stringify({
+        filename,
+        url: pathToFileURL(target).href,
+        digest: createHash("sha256").update(readFileSync(target)).digest("hex"),
+      })}\n`);
+    }
+  }
   return root;
 }
 
@@ -101,8 +115,9 @@ function stopFakeOllama(child) {
   return new Promise((resolve) => child.once("close", resolve));
 }
 
-test("paid qualification crosses a fake executable only after reservation and reconciles the same invocation", () => {
+test("paid qualification crosses a fake executable only after reservation and reconciles the same invocation", (context) => {
   const root = isolatedFactory();
+  context.after(() => rmSync(root, { recursive: true, force: true }));
   const markerPath = path.join(root, "starts.jsonl");
   const result = qualify(root, markerPath);
   assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -123,8 +138,9 @@ test("paid qualification crosses a fake executable only after reservation and re
   assert.equal(records(markerPath).length, before, "denied qualification must not spawn");
 });
 
-test("paid run-worker reserves before its fake executable and denial prevents spawn", () => {
+test("paid run-worker reserves before its fake executable and denial prevents spawn", (context) => {
   const root = isolatedFactory();
+  context.after(() => rmSync(root, { recursive: true, force: true }));
   const markerPath = path.join(root, "starts.jsonl");
   const benchmark = qualify(root, markerPath, "benchmark");
   assert.equal(benchmark.status, 0, benchmark.stderr || benchmark.stdout);
@@ -183,8 +199,9 @@ test("paid run-worker reserves before its fake executable and denial prevents sp
   assert.equal(records(markerPath).length, before + 1, "denied admission must not spawn");
 });
 
-test("paid OpenAI smoke reserves each fake process and reconciles both invocations", () => {
+test("paid OpenAI smoke reserves each fake process and reconciles both invocations", (context) => {
   const root = isolatedFactory();
+  context.after(() => rmSync(root, { recursive: true, force: true }));
   const markerPath = path.join(root, "starts.jsonl");
   const result = run(process.execPath, [
     path.join(root, "scripts", "fleet-smoke.mjs"),
@@ -289,8 +306,9 @@ test("local patch crosses fake Ollama and records an accepted bounded commit", a
   git(repository, ["branch", "-D", result.branch]);
 });
 
-test("real supervisor reaps a child and grandchild on timeout before resolving and removes listeners", async () => {
+test("real supervisor reaps a child and grandchild on timeout before resolving and removes listeners", async (context) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-tree-"));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
   const pidsPath = path.join(root, "pids.jsonl");
   const sigintListeners = process.listenerCount("SIGINT");
   const sigtermListeners = process.listenerCount("SIGTERM");

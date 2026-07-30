@@ -241,7 +241,7 @@ h3 { font-size: 20px; }
 }
 .board-metrics div { min-height: 112px; padding: 20px 15px; border-right: 1px solid #2d3e37; }
 .board-metrics div:last-child { border: 0; }
-.board-metrics strong { display: block; color: #f18a62; font: 500 30px/1 Georgia, serif; overflow-wrap: anywhere; }
+.board-metrics strong { display: block; color: #f18a62; font: 500 26px/1 Georgia, serif; overflow-wrap: normal; white-space: nowrap; }
 .board-metrics span { display: block; margin-top: 9px; color: #9aaca4; font-size: 12px; line-height: 1.4; }
 .candidate-scroll { overflow-x: auto; padding: 10px 22px 12px; }
 .candidate-scroll-hint { display: none; }
@@ -272,6 +272,19 @@ h3 { font-size: 20px; }
 .problem-copy { padding-top: 37px; }
 .problem-copy p { margin: 0 0 22px; color: var(--muted); font-size: 18px; }
 .problem-copy p:first-child { color: var(--ink); font-size: 21px; }
+.prompt-actions { display: flex; min-height: 44px; align-items: center; gap: 12px; margin-bottom: 8px; }
+.copy-prompt {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--cream);
+  background: var(--green);
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  font-weight: 800;
+  cursor: pointer;
+}
+.copy-status { color: var(--muted); font-size: 13px; }
 .coordinator-prompt {
   margin: 0 0 22px;
   padding: 18px;
@@ -398,7 +411,7 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
 .footer-brand { color: var(--cream); }
 .footer-grid p { margin: 0; font-size: 13px; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 22px; }
-.footer-links a { font-size: 13px; text-underline-offset: 4px; }
+.footer-links a { min-width: 44px; font-size: 13px; text-underline-offset: 4px; }
 
 @media (max-width: 960px) {
   .hero, .problem-grid, .controls-layout, .routing-layout, .evidence, .quick-layout, .status-intro { grid-template-columns: 1fr; }
@@ -412,7 +425,7 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
   .final-inner { grid-template-columns: 1fr; }
 }
 
-@media (max-width: 840px) {
+@media (max-width: 860px) {
   :root { --shell: min(100% - 28px, 1180px); }
   .section { padding-block: 78px; }
   .nav { min-height: 64px; }

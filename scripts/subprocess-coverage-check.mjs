@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   mkdtempSync,
   readFileSync,
@@ -19,14 +20,9 @@ const TARGETS = Object.freeze({
   "run-local-patch.mjs": { lines: 77, functions: 78 },
 });
 
-function matchingScripts(profiles, filename) {
-  const suffix = `/scripts/${filename}`;
+function matchingScripts(profiles, filename, allowedUrls) {
   return profiles.flatMap((profile) => profile.result ?? []).filter((script) => {
-    try {
-      return new URL(script.url).pathname.replaceAll("\\", "/").endsWith(suffix);
-    } catch {
-      return false;
-    }
+    return allowedUrls.has(script.url);
   });
 }
 
@@ -43,8 +39,15 @@ function effectiveCount(functions, position) {
   return selected?.count ?? 0;
 }
 
-export function analyzeSubprocessCoverage({ profiles, filename, source }) {
-  const scripts = matchingScripts(profiles, filename);
+export function analyzeSubprocessCoverage({ profiles, filename, source, allowedSources }) {
+  const expectedDigest = createHash("sha256").update(source).digest("hex");
+  const allowedUrls = new Set(
+    allowedSources
+      .filter((entry) => entry.filename === filename && entry.digest === expectedDigest)
+      .map((entry) => entry.url),
+  );
+  if (!allowedUrls.size) throw new Error(`No source-authenticated subprocess manifest entries for scripts/${filename}`);
+  const scripts = matchingScripts(profiles, filename, allowedUrls);
   if (!scripts.length) throw new Error(`No subprocess coverage found for scripts/${filename}`);
   const coveredPositions = new Uint8Array(source.length);
   const functions = new Map();
@@ -102,6 +105,8 @@ export function enforceThresholds(metrics, thresholds, filename) {
 
 export function main() {
   const coverageRoot = mkdtempSync(path.join(os.tmpdir(), "codex-factory-v8-coverage-"));
+  const manifestPath = path.join(coverageRoot, "source-manifest.jsonl");
+  const allowedSources = [];
   try {
     const result = spawnSync(process.execPath, [
       "--test",
@@ -111,7 +116,11 @@ export function main() {
       encoding: "utf8",
       windowsHide: true,
       timeout: 120_000,
-      env: { ...process.env, NODE_V8_COVERAGE: coverageRoot },
+      env: {
+        ...process.env,
+        NODE_V8_COVERAGE: coverageRoot,
+        CODEX_FACTORY_COVERAGE_MANIFEST: manifestPath,
+      },
     });
     process.stdout.write(result.stdout ?? "");
     process.stderr.write(result.stderr ?? "");
@@ -120,9 +129,12 @@ export function main() {
     const profiles = readdirSync(coverageRoot)
       .filter((name) => name.endsWith(".json"))
       .map((name) => JSON.parse(readFileSync(path.join(coverageRoot, name), "utf8")));
+    allowedSources.push(
+      ...readFileSync(manifestPath, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line)),
+    );
     for (const [filename, thresholds] of Object.entries(TARGETS)) {
       const source = readFileSync(path.join(ROOT, "scripts", filename), "utf8");
-      const metrics = analyzeSubprocessCoverage({ profiles, filename, source });
+      const metrics = analyzeSubprocessCoverage({ profiles, filename, source, allowedSources });
       enforceThresholds(metrics, thresholds, filename);
       process.stdout.write(
         `subprocess coverage ${filename}: lines ${metrics.lines.toFixed(2)}% `

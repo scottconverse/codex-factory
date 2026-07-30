@@ -23,12 +23,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Test repository
-        run: npm run check
-      - name: Measure built-in test coverage
-        run: npm run test:coverage
-      - name: Prove critical tests kill known defects
-        run: npm run test:mutation
+      - name: Verify repository
+        run: npm run verify
       - name: Build website
         run: npm run site:build
       - name: Check website

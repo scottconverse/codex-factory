@@ -28,6 +28,11 @@ limit, paid reservations are admission policy rather than a hard per-turn cap.
 
 ## 2026-07-29 — Keep the product decision open
 
+**Superseded for the current product scope on 2026-07-29.** Codex Factory is
+limited to the bounded coordinator/worker supervisor. A PM-facing governance or
+control-room layer is out of scope unless the owner makes a new explicit
+product decision with separate safety evidence.
+
 The bakeoff may end with Codex alone, this thin plugin, a PM-facing governance
 layer, or continued DevHarmonics development. Evidence decides.
 

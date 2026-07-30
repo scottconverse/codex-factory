@@ -45,3 +45,22 @@ test("repository agent contract permits the documented preview-authorized fallba
   assert.match(agents, /reviewed campaign may advance once through.*local.*Luna.*Terra/is);
   assert.doesNotMatch(agents, /Never retry automatically/);
 });
+
+test("operator documentation and CI use the canonical full verification gate", () => {
+  const packageJson = JSON.parse(read("package.json"));
+  assert.match(packageJson.scripts.verify, /npm run check/);
+  assert.match(packageJson.scripts.verify, /npm run test:coverage/);
+  assert.match(packageJson.scripts.verify, /npm run test:mutation/);
+  for (const filename of ["README.md", "CONTRIBUTING.md", "docs/USER-MANUAL.md", "site/index.html"]) {
+    assert.match(read(filename), /npm\.cmd run verify/, `${filename} must name the full gate`);
+  }
+  assert.match(read(".github/workflows/pages.yml"), /run:\s*npm run verify/);
+});
+
+test("current strategy documents keep a PM control room explicitly out of scope", () => {
+  assert.match(read("docs/CAPABILITY-MATRIX.md"), /PM-facing Control Room.*Out of current scope/i);
+  assert.match(
+    read("docs/DECISIONS.md"),
+    /Superseded for the current product scope[\s\S]*control-room layer is out of scope/i,
+  );
+});

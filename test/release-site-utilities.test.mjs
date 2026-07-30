@@ -125,9 +125,9 @@ test("site validation updates stale versioned cards and intentionally permits an
   assert.equal(evergreen.status, 0, "an evergreen social card intentionally carries no release version");
 });
 
-function request(port, method) {
+function request(port, method, requestPath = "/") {
   return new Promise((resolve, reject) => {
-    const request = http.request({ hostname: "127.0.0.1", port, path: "/", method }, (response) => {
+    const request = http.request({ hostname: "127.0.0.1", port, path: requestPath, method }, (response) => {
       let body = "";
       response.setEncoding("utf8");
       response.on("data", (chunk) => {
@@ -182,4 +182,11 @@ test("preview server permits only GET and HEAD", async (context) => {
   const post = await request(port, "POST");
   assert.equal(post.status, 405);
   assert.equal(post.headers.allow, "GET, HEAD");
+  const missing = await request(port, "GET", "/does-not-exist");
+  assert.equal(missing.status, 404);
+  assert.match(missing.headers["content-type"], /text\/html/);
+  assert.match(missing.body, /Page not found/i);
+  assert.match(missing.body, /href="\/"/i);
+  assert.match(missing.body, /<header\b/i);
+  assert.match(missing.body, /<footer\b/i);
 });
