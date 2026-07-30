@@ -97,7 +97,7 @@ qualification, routes, receipts, recovery, and FAQ.
 
 ## Important boundary
 
-Codex reports token usage after a model turn. Version 0.1.3 can reject an unsafe
+Codex reports token usage after a model turn. Version 0.1.4 can reject an unsafe
 launch and mark a terminal result over budget, but it cannot interrupt a single
 turn at an exact token count. Wall-clock timeout and process ownership are the
 hard runtime controls.
@@ -137,16 +137,16 @@ begins. Those
 host-specific records remain private; tracked examples are not runtime
 allowlists.
 
-The prompt-driven coordinator work on `main` after the `v0.1.3` tag is
-**Unreleased**. Package and site version labels remain at the latest published
-release until the owner selects the next version.
+Version 0.1.4 publishes the prompt-driven coordinator intake, private campaign
+planning, qualified local-first fallback routing, and the related receipt,
+containment, cleanup, and public-onboarding improvements.
 
 ## Project documents
 
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Worker model ladder](docs/MODEL-LADDER.md)
-- [0.1.3 release notes](docs/RELEASE-NOTES-0.1.3.md)
+- [0.1.4 release notes](docs/RELEASE-NOTES-0.1.4.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
 - [Experiment plan](docs/EXPERIMENT-PLAN.md)
 - [Bakeoff ledger](docs/BAKEOFF-LEDGER.md)

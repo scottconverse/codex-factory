@@ -1,10 +1,6 @@
 # Codex Factory user manual
 
-Version 0.1.3
-
-> Development note: prompt-driven coordinator intake on `main` is Unreleased
-> work after the `v0.1.3` tag. The version above remains the latest published
-> release until the owner selects the next version.
+Version 0.1.4
 
 ## What Codex Factory is
 

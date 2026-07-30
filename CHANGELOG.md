@@ -4,6 +4,8 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-30
+
 ### Added
 
 - Prompt-driven coordination from a normal-language owner request. The active
@@ -13,8 +15,7 @@ All notable changes to Codex Factory are documented here.
 
 ### Changed
 
-- Public onboarding now starts with the owner-prompt journey and identifies
-  post-`v0.1.3` coordinator work as unreleased.
+- Public onboarding now starts with the owner-prompt journey.
 - Executed local qualifications now retain the same request, event,
   diagnostics, timing, usage, and terminal-result evidence expected from paid
   qualification runs.
