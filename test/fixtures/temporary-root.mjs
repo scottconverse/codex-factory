@@ -4,11 +4,15 @@ import path from "node:path";
 
 export function createTemporaryRoot(context, prefix) {
   const root = mkdtempSync(path.join(os.tmpdir(), prefix));
-  context.after(() => rmSync(root, {
+  context.after(() => removeTemporaryRoot(root));
+  return root;
+}
+
+export function removeTemporaryRoot(root) {
+  rmSync(root, {
     recursive: true,
     force: true,
     maxRetries: 3,
     retryDelay: 50,
-  }));
-  return root;
+  });
 }

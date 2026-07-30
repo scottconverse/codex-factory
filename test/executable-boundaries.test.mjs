@@ -9,7 +9,6 @@ import {
   mkdirSync,
   readFileSync,
   readdirSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
 import os from "node:os";
@@ -18,6 +17,7 @@ import process from "node:process";
 import test from "node:test";
 import { pathToFileURL } from "node:url";
 import { superviseProcess } from "../scripts/factory-process.mjs";
+import { removeTemporaryRoot } from "./fixtures/temporary-root.mjs";
 
 const PROJECT = path.resolve(import.meta.dirname, "..");
 const FAKE_CODEX = path.join(import.meta.dirname, "fixtures", "fake-codex.mjs");
@@ -143,7 +143,7 @@ function stopFakeOllama(child) {
 
 test("paid qualification crosses a fake executable only after reservation and reconciles the same invocation", (context) => {
   const root = isolatedFactory();
-  context.after(() => rmSync(root, { recursive: true, force: true }));
+  context.after(() => removeTemporaryRoot(root));
   const markerPath = path.join(root, "starts.jsonl");
   const result = qualify(root, markerPath);
   assert.equal(result.status, 0, result.stderr || result.stdout);
@@ -166,7 +166,7 @@ test("paid qualification crosses a fake executable only after reservation and re
 
 test("paid run-worker reserves before its fake executable and denial prevents spawn", (context) => {
   const root = isolatedFactory();
-  context.after(() => rmSync(root, { recursive: true, force: true }));
+  context.after(() => removeTemporaryRoot(root));
   const markerPath = path.join(root, "starts.jsonl");
   const benchmark = qualify(root, markerPath, "benchmark");
   assert.equal(benchmark.status, 0, benchmark.stderr || benchmark.stdout);
@@ -227,7 +227,7 @@ test("paid run-worker reserves before its fake executable and denial prevents sp
 
 test("paid OpenAI smoke reserves each fake process and reconciles both invocations", (context) => {
   const root = isolatedFactory();
-  context.after(() => rmSync(root, { recursive: true, force: true }));
+  context.after(() => removeTemporaryRoot(root));
   const markerPath = path.join(root, "starts.jsonl");
   const result = run(process.execPath, [
     path.join(root, "scripts", "fleet-smoke.mjs"),
@@ -260,7 +260,7 @@ test("local patch crosses fake Ollama and records an accepted bounded commit", a
   const ollama = await startFakeOllama();
   t.after(async () => {
     await stopFakeOllama(ollama.child);
-    rmSync(root, { recursive: true, force: true });
+    removeTemporaryRoot(root);
   });
   const env = { ...process.env, CODEX_FACTORY_TEST_OLLAMA_URL: ollama.baseUrl };
   for (const role of ["benchmark", "structured_write"]) {
@@ -339,7 +339,7 @@ test("failed local qualification retains the Ollama request, response, diagnosti
   const ollama = await startFakeOllama({ CODEX_FACTORY_FAKE_OLLAMA_FAILURE: "generate" });
   t.after(async () => {
     await stopFakeOllama(ollama.child);
-    rmSync(root, { recursive: true, force: true });
+    removeTemporaryRoot(root);
   });
   const qualification = run(process.execPath, [
     path.join(root, "scripts", "qualify-fleet.mjs"),
@@ -362,7 +362,7 @@ test("failed local qualification retains the Ollama request, response, diagnosti
 
 test("real supervisor reaps a child and grandchild on timeout before resolving and removes listeners", async (context) => {
   const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-tree-"));
-  context.after(() => rmSync(root, { recursive: true, force: true }));
+  context.after(() => removeTemporaryRoot(root));
   const pidsPath = path.join(root, "pids.jsonl");
   const sigintListeners = process.listenerCount("SIGINT");
   const sigtermListeners = process.listenerCount("SIGTERM");
@@ -470,5 +470,5 @@ test("campaign default worker subprocess produces and integrates a deterministic
   assert.equal(existsSync(failure.integrationPath), false, "malformed receipt campaign must clean integration worktree");
   assert.match(failure.attempts[0].error, /"status": "failed"/);
   assert.equal(git(repository, ["rev-parse", "HEAD"]), ownerHead);
-  rmSync(root, { recursive: true, force: true });
+  removeTemporaryRoot(root);
 });
