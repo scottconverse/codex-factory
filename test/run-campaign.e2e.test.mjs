@@ -151,3 +151,25 @@ test("a failed real campaign removes worker and integration worktrees and record
   assert.equal(git(repository, ["rev-parse", "HEAD"]), ownerHead);
   assert.equal(git(repository, ["status", "--short"]), "");
 });
+
+test("campaign preview fails closed when a task has no qualified attempts", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-preview-"));
+  const repository = createOwnerRepository(root);
+  const intake = createCoordinatorIntake({
+    repository,
+    prompt: "Build the requested result only after a qualified route is available.",
+    campaignId: `preview-${process.pid}-${Date.now()}`,
+  });
+  coordinatorPlan(intake, readFileSync(intake.sourcePath, "utf8"));
+
+  await assert.rejects(() => campaignRunner.runCampaign({
+    planFile: intake.planFile,
+    resolveAttempts: () => [],
+  }), (error) => {
+    assert.match(error.message, /build-result/);
+    assert.match(error.message, /standard/);
+    assert.match(error.message, /npm\.cmd run fleet:qualify/);
+    assert.match(error.message, /preview/i);
+    return true;
+  });
+});

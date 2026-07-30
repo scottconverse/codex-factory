@@ -86,9 +86,11 @@ declared file contents and returns complete text for allowlisted files. It
 cannot select commands or filesystem paths outside the task contract.
 
 `scripts/factory-fleet.mjs` ports the proven DevHarmonics candidate pattern:
-runtime discovery, exact model/runtime/harness fingerprints, role-scoped
-qualification, a structured-reasoning benchmark for mutating work, capability
-admission, tier fit, and free-local-first selection.
+runtime discovery; SHA-256 fingerprints over candidate ID, runtime and adapter
+versions, capabilities, model digest when available, tier, reasoning effort,
+and the complete role harness; role-scoped qualification; a structured-reasoning
+benchmark for mutating work; capability admission; tier fit; and
+free-local-first selection.
 `scripts/qualify-fleet.mjs` exercises every worker-capable discovered candidate;
 embedding-only inventory remains visible but is not treated as a subagent.
 

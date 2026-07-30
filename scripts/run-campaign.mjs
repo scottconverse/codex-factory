@@ -359,6 +359,14 @@ export async function runCampaign({
       ? resolveAttempts({ task, plan, candidates, qualifications, config })
       : buildAttemptLadder({ task, candidates, qualifications, routes: config.routes }),
   ]));
+  for (const task of plan.tasks) {
+    if (!ladders[task.id].length) {
+      throw new Error(
+        `Campaign preview cannot route task "${task.id}" (role "${task.role}"): no currently qualified attempts. `
+        + "Preview candidate qualification with `npm.cmd run fleet:qualify`, then run the applicable qualification before previewing this campaign again.",
+      );
+    }
+  }
   const preview = {
     campaignId: plan.campaignId,
     repository,

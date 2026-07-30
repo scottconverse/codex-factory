@@ -59,32 +59,32 @@
       <div class="roster-board">
         <div class="board-head">
           <div>
-            <span class="board-kicker">LOCAL QUALIFICATION RUN</span>
-            <strong>Candidate roster</strong>
+            <span class="board-kicker">ROUTING POLICY PREVIEW</span>
+            <strong>Illustrative candidate roster</strong>
           </div>
-          <span class="board-state"><i></i> COMPLETE</span>
+          <span class="board-state"><i></i> EXAMPLE</span>
         </div>
         <div class="board-metrics">
-          <div><strong>17</strong><span>installed models inventoried</span></div>
-          <div><strong>16</strong><span>worker-capable candidates</span></div>
-          <div><strong>48</strong><span>role checks executed</span></div>
-          <div><strong>7</strong><span>write-ready on this host</span></div>
+          <div><strong>Discover</strong><span>installed local candidates</span></div>
+          <div><strong>Qualify</strong><span>each exact role fingerprint</span></div>
+          <div><strong>Prefer</strong><span>qualified free local capacity</span></div>
+          <div><strong>Fallback</strong><span>Luna, then Terra when admitted</span></div>
         </div>
         <p class="candidate-scroll-hint">Swipe or scroll to see all role results <span aria-hidden="true">→</span></p>
         <div class="candidate-scroll" role="region" aria-label="Candidate qualification results; scroll horizontally for all roles" tabindex="0">
           <table class="candidate-table">
-            <caption>Candidate qualification results from the tested development host</caption>
+            <caption>Illustrative role-scoped qualification states; not current host results</caption>
             <thead>
               <tr><th scope="col">Candidate</th><th scope="col">Analysis</th><th scope="col">Benchmark</th><th scope="col">Write</th></tr>
             </thead>
             <tbody>
-              <tr><th scope="row">qwen3.5:9b</th><td class="pass">Pass</td><td class="pass">Pass</td><td class="pass">Pass</td></tr>
-              <tr><th scope="row">gemma4:12b</th><td class="pass">Pass</td><td class="pass">Pass</td><td class="pass">Pass</td></tr>
-              <tr><th scope="row">nomic-embed-text</th><td class="na">Inventory only</td><td class="dash">—</td><td class="dash">—</td></tr>
+              <tr><th scope="row">Local completion model</th><td class="na">Qualify</td><td class="na">Qualify</td><td class="na">Qualify</td></tr>
+              <tr><th scope="row">Luna / Terra fallback</th><td class="na">Opt in</td><td class="na">Opt in</td><td class="na">Opt in</td></tr>
+              <tr><th scope="row">Embedding-only model</th><td class="na">Inventory only</td><td class="dash">—</td><td class="dash">—</td></tr>
             </tbody>
           </table>
         </div>
-        <p class="board-note">Snapshot observed 2026-07-29 on the development host with Ollama 0.32.4. Runtime routing uses the latest record for the exact model, runtime, adapter, harness, and role fingerprint; changing one requires qualification again.</p>
+        <p class="board-note">This board is illustrative, not a host qualification claim. Runtime routing uses the latest private record for a SHA-256 fingerprint over candidate ID, runtime and adapter versions, capabilities, model digest when available, tier, reasoning effort, and the complete role harness.</p>
       </div>
     </section>
 
@@ -106,8 +106,12 @@
           <h2>You provide the request. The coordinator creates the private plan.</h2>
         </div>
         <div class="problem-copy">
-          <p>Open the Factory checkout in a top-level Codex task. Tell the selected model to read <code>skills/codex-factory/SKILL.md</code>, give it the target path and your request, then continue in that task.</p>
+          <p>Open the Factory checkout in a top-level Codex task. Paste this prompt, fill in the target and request fields, and continue in that task:</p>
+          <pre class="coordinator-prompt" aria-label="Copyable coordinator prompt"><code>Read and follow skills/codex-factory/SKILL.md completely.
+Target repository: &lt;absolute path to the existing repository or new destination&gt;
+Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre>
           <p>The coordinator inspects an existing clean repository or bootstraps one explicit new destination, creates <code>campaign.json</code> privately, previews bounded routes, runs only authorized workers, integrates accepted commits, and returns evidence for your review. You never author Factory JSON.</p>
+          <a class="text-link" href="https://github.com/scottconverse/codex-factory/blob/main/docs/USER-MANUAL.md#campaign-coordination">Use the manual fallback <span aria-hidden="true">→</span></a>
         </div>
       </div>
     </section>
@@ -189,7 +193,9 @@
           <h2>Match evidence and cost to the work.</h2>
           <p>These are default policy tiers, not performance guarantees. The selected model must also have a current qualification for the required role.</p>
         </div>
-        <div class="route-table" role="region" aria-label="Default role policies" tabindex="0">
+        <div>
+          <p class="route-scroll-hint">Swipe or scroll to see every routing policy <span aria-hidden="true">→</span></p>
+          <div class="route-table" role="region" aria-label="Default role policies; scroll horizontally for every column" tabindex="0">
           <table>
             <thead><tr><th scope="col">Work</th><th scope="col">Minimum tier</th><th scope="col">Required evidence</th><th scope="col">Access</th></tr></thead>
             <tbody>
@@ -201,6 +207,7 @@
             </tbody>
           </table>
           <p>Critical work is not dispatched by campaign plans; keep Sol in the coordinator role and split or escalate that work outside the campaign runner.</p>
+          </div>
         </div>
       </div>
     </section>

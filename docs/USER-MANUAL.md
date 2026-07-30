@@ -155,8 +155,10 @@ npm.cmd run fleet:qualify -- --include-paid --execute
 ```
 
 Ollama discovery inventories every installed model. Embedding-only models remain
-visible but do not enter the subagent harness. Each result is bound to the exact
-provider, model, runtime version, adapter version, role, and harness. A failed
+visible but do not enter the subagent harness. Each result is bound to a
+SHA-256 fingerprint over the candidate ID (provider and model), runtime version,
+adapter version, declared capabilities, immutable model digest when the runtime
+provides one, tier, reasoning effort, and the complete role harness. A failed
 structured-write qualification does not erase a passing analysis qualification.
 Mutating admission also requires the candidate to pass a derived structured-
 reasoning benchmark; a protocol-only write response is insufficient. Current
@@ -390,9 +392,14 @@ creates the JSON privately under Factory-owned ignored state.
 
 ### Which qualification result is current?
 
-The latest record for the exact provider, model, runtime, adapter, harness, and
-role fingerprint controls admission. Tracked model ladders and bakeoff ledgers
-are historical evidence, not runtime allowlists.
+The latest record for the exact role fingerprint controls admission. That
+fingerprint hashes the candidate ID (provider and model), runtime version,
+adapter version, declared capabilities, immutable model digest when available,
+tier, reasoning effort, and the complete role harness. Tracked model ladders and
+bakeoff ledgers are historical evidence, not runtime allowlists. Qualification
+records and receipts remain private because they may contain host and task
+details; the public site therefore makes no claim that a named model is
+currently qualified on your host.
 
 ### Why can paid use exceed its reservation?
 

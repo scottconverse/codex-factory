@@ -3,9 +3,11 @@
 Last tested: 2026-07-29
 
 > Historical evidence snapshot. Runtime routing does not use this document as
-> an allowlist. The latest qualification record for the exact provider,
-> model, runtime, adapter, harness, and role fingerprint is authoritative;
-> changing any component requires qualification again.
+> an allowlist. The latest qualification record for the exact SHA-256
+> fingerprint is authoritative. It covers candidate ID, runtime and adapter
+> versions, capabilities, model digest when available, tier, reasoning effort,
+> and the complete role harness; changing any component requires qualification
+> again.
 
 This was a narrow concurrency smoke test, not a general coding benchmark. Every
 rung received the same two embedded repository excerpts and had to return two

@@ -126,8 +126,11 @@ It is not a PM control room, automatic merge system, semantic verifier, or hard
 real-time spend controller.
 Candidate availability is discovered rather than hardcoded. Qualification is
 role scoped: a model may qualify for analysis and fail structured writes without
-being removed from the fleet. The current host must qualify its exact runtime
-fingerprints before routing begins.
+being removed from the fleet. The current host must qualify the exact candidate
+ID, runtime and adapter versions, capabilities, model digest when available,
+tier, reasoning effort, and role harness before routing begins. Those
+host-specific records remain private; tracked examples are not runtime
+allowlists.
 
 The prompt-driven coordinator work on `main` after the `v0.1.3` tag is
 **Unreleased**. Package and site version labels remain at the latest published
