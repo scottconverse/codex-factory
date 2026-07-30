@@ -62,6 +62,21 @@ function gitRoot(repository) {
   return path.resolve(git(["rev-parse", "--show-toplevel"], repository).stdout.trim());
 }
 
+function assertRepositorySnapshot(repository, base) {
+  if (!/^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(base)) {
+    throw new Error("Campaign base must be the immutable commit recorded by coordinator intake");
+  }
+  const trackedChanges = git(["diff", "--quiet"], repository, { allowFailure: true }).status !== 0
+    || git(["diff", "--cached", "--quiet"], repository, { allowFailure: true }).status !== 0;
+  if (trackedChanges) {
+    throw new Error("Campaign repository has tracked owner changes after coordinator intake");
+  }
+  const currentHead = git(["rev-parse", "HEAD"], repository).stdout.trim();
+  if (currentHead !== base) {
+    throw new Error(`Campaign repository changed since coordinator intake: HEAD ${currentHead} does not match pinned base ${base}`);
+  }
+}
+
 function resolveCampaignSource(repository, sourceFile) {
   const root = realpathSync(repository);
   const source = realpathSync(path.resolve(root, sourceFile));
@@ -135,12 +150,17 @@ function runChild(command, args, cwd, activeChildren) {
       activeChildren?.delete(child);
       const output = Buffer.concat(stdout).toString("utf8").trim();
       const diagnostics = Buffer.concat(stderr).toString("utf8").trim();
+      let parsed = null;
+      try { parsed = output ? JSON.parse(output) : null; } catch {}
       if (code !== 0) {
-        reject(new Error(diagnostics || output || `${command} exited ${code}`));
+        const error = new Error(parsed?.error || diagnostics || output || `${command} exited ${code}`);
+        error.code = parsed?.errorCode || (parsed ? "WORKER_ATTEMPT_FAILED" : "WORKER_INFRASTRUCTURE_FAILED");
+        error.workerResult = parsed;
+        reject(error);
         return;
       }
       try {
-        resolve(output ? JSON.parse(output) : null);
+        resolve(parsed ?? (output ? JSON.parse(output) : null));
       } catch {
         reject(new Error(`Worker returned an invalid JSON receipt: ${output.slice(0, 400)}`));
       }
@@ -246,7 +266,11 @@ async function executeLocalAttempt({ plan, task, attempt, repository, base, sour
     check: task.check,
     commitMessage: task.commitMessage,
   }, null, 2)}\n`);
-  return runChild(process.execPath, [path.join(ROOT, "scripts", "run-local-patch.mjs"), "--task-file", taskPath, "--execute"], ROOT, activeChildren);
+  try {
+    return await runChild(process.execPath, [path.join(ROOT, "scripts", "run-local-patch.mjs"), "--task-file", taskPath, "--execute"], ROOT, activeChildren);
+  } catch (error) {
+    throw error;
+  }
 }
 
 async function executeCodexAttempt({
@@ -299,7 +323,11 @@ async function executeCodexAttempt({
         promptPath,
       })
       : await runChild(workerCommand, workerArgs, ROOT, activeChildren);
-    if (worker.status !== "process_completed") throw new Error(`Worker ended with ${worker.status}`);
+    if (worker.status !== "process_completed") {
+      const error = new Error(`Worker ended with ${worker.status}`);
+      error.code = worker.errorCode || "WORKER_ATTEMPT_FAILED";
+      throw error;
+    }
     assertSafeWritePaths(worktreePath, task.writePaths);
     let uniqueChanged = validateChangedPaths(worktreePath, base, task.writePaths);
     if (!uniqueChanged.length) throw new Error("Worker produced no repository changes");
@@ -330,6 +358,7 @@ async function executeCodexAttempt({
     const cleanupError = cleanupWorktree(repository, { worktreePath, branch });
     recordCleanup(runPath, "failed-worker", { worktreePath, branch }, cleanupError);
     if (cleanupError) throw new AggregateError([error, new Error(`Worker cleanup failed: ${cleanupError}`)], "Worker attempt and cleanup failed");
+    if (!error.code && !(error instanceof AggregateError)) error.code = "WORKER_ATTEMPT_FAILED";
     throw error;
   }
 }
@@ -344,6 +373,7 @@ export async function runCampaign({
   const planPath = path.resolve(planFile);
   const plan = validateCampaign(JSON.parse(readFileSync(planPath, "utf8")));
   const repository = gitRoot(path.resolve(plan.repository));
+  assertRepositorySnapshot(repository, plan.base);
   const sourcePath = plan.sourceFile ? resolveCampaignSource(repository, plan.sourceFile) : null;
   const source = plan.source ?? readFileSync(sourcePath, "utf8");
   const config = validateConfig(JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8")));
@@ -392,7 +422,10 @@ export async function runCampaign({
   const activeChildren = new Set();
   let interrupted = null;
   const interrupt = (signal) => {
-    interrupted ??= new Error(`Campaign interrupted by ${signal}`);
+    if (!interrupted) {
+      interrupted = new Error(`Campaign interrupted by ${signal}`);
+      interrupted.code = "CAMPAIGN_INTERRUPTED";
+    }
     for (const child of activeChildren) terminateChild(child);
   };
   const onSigint = () => interrupt("SIGINT");

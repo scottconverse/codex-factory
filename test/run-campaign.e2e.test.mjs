@@ -173,3 +173,137 @@ test("campaign preview fails closed when a task has no qualified attempts", asyn
     return true;
   });
 });
+
+test("campaign refuses repository commits made after coordinator intake", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-drift-"));
+  const repository = createOwnerRepository(root);
+  const intake = createCoordinatorIntake({
+    repository,
+    prompt: "Build only from the repository snapshot inspected at intake.",
+    campaignId: `drift-${process.pid}-${Date.now()}`,
+  });
+  coordinatorPlan(intake, readFileSync(intake.sourcePath, "utf8"));
+  writeFileSync(path.join(repository, "after-intake.txt"), "owner commit\n");
+  git(repository, ["add", "after-intake.txt"]);
+  git(repository, ["commit", "-m", "owner: advance after intake"]);
+
+  await assert.rejects(() => campaignRunner.runCampaign({
+    planFile: intake.planFile,
+    resolveAttempts: injectedAttempts,
+  }), /changed since coordinator intake|does not match.*base/i);
+});
+
+test("campaign refuses tracked owner edits made after coordinator intake", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-dirty-"));
+  const repository = createOwnerRepository(root);
+  const intake = createCoordinatorIntake({
+    repository,
+    prompt: "Preserve owner edits made after this intake.",
+    campaignId: `dirty-${process.pid}-${Date.now()}`,
+  });
+  coordinatorPlan(intake, readFileSync(intake.sourcePath, "utf8"));
+  writeFileSync(path.join(repository, "verify.mjs"), "throw new Error('owner edit');\n");
+
+  await assert.rejects(() => campaignRunner.runCampaign({
+    planFile: intake.planFile,
+    resolveAttempts: injectedAttempts,
+  }), /tracked owner changes/i);
+});
+
+test("campaign waits for parallel siblings before writing failure and cleaning every worktree", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-sibling-"));
+  const repository = createOwnerRepository(root);
+  const stateRoot = path.join(root, "factory-state");
+  const intake = createCoordinatorIntake({
+    repository,
+    prompt: "Run two independent tasks and clean both if either fails.",
+    campaignId: `sibling-${process.pid}-${Date.now()}`,
+  });
+  const check = (file) => ({
+    command: process.execPath,
+    args: ["-e", `require("node:fs").accessSync(${JSON.stringify(file)})`],
+  });
+  coordinatorPlan(intake, readFileSync(intake.sourcePath, "utf8"), {
+    maxParallel: 2,
+    tasks: [
+      {
+        id: "fail-fast",
+        role: "standard",
+        instructions: "Fail this fixture so sibling cleanup is exercised.",
+        readPaths: ["verify.mjs"],
+        writePaths: ["src/fail.txt"],
+        dependsOn: [],
+        parallelSafe: true,
+        check: check("src/fail.txt"),
+        commitMessage: "test: fail fixture",
+      },
+      {
+        id: "slow-sibling",
+        role: "standard",
+        instructions: "Finish after the failing sibling has returned.",
+        readPaths: ["verify.mjs"],
+        writePaths: ["src/slow.txt"],
+        dependsOn: [],
+        parallelSafe: true,
+        check: check("src/slow.txt"),
+        commitMessage: "test: slow fixture",
+      },
+    ],
+  });
+  let slowSettled = false;
+
+  await assert.rejects(() => campaignRunner.runCampaign({
+    planFile: intake.planFile,
+    execute: true,
+    stateRoot,
+    resolveAttempts: injectedAttempts,
+    launchWorker: async ({ task, worktreePath }) => {
+      if (task.id === "fail-fast") return { status: "failed" };
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      writeFileSync(path.join(worktreePath, "src", "slow.txt"), "slow sibling\n");
+      slowSettled = true;
+      return { status: "process_completed" };
+    },
+  }), /exhausted/i);
+
+  assert.equal(slowSettled, true);
+  const worktrees = git(repository, ["worktree", "list", "--porcelain"]);
+  assert.doesNotMatch(worktrees, /codex-factory[\\/]campaigns/i);
+  const runPath = path.join(stateRoot, ".codex-factory", "campaigns");
+  const run = readdirSync(runPath).at(0);
+  const result = JSON.parse(readFileSync(path.join(runPath, run, "result.json"), "utf8"));
+  assert.equal(result.status, "failed");
+  const cleanup = readFileSync(path.join(runPath, run, "cleanup.jsonl"), "utf8");
+  assert.match(cleanup, /slow-sibling/);
+});
+
+test("campaign does not launch a fallback after a worker containment failure", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-containment-"));
+  const repository = createOwnerRepository(root);
+  const intake = createCoordinatorIntake({
+    repository,
+    prompt: "Stop the campaign if a worker process cannot be reaped.",
+    campaignId: `containment-${process.pid}-${Date.now()}`,
+  });
+  coordinatorPlan(intake, readFileSync(intake.sourcePath, "utf8"));
+  const attempts = [
+    { ...injectedAttempts()[0], id: "injected:local", model: "local" },
+    { ...injectedAttempts()[0], id: "injected:luna", model: "gpt-5.6-luna" },
+  ];
+  const seen = [];
+
+  await assert.rejects(() => campaignRunner.runCampaign({
+    planFile: intake.planFile,
+    execute: true,
+    stateRoot: path.join(root, "factory-state"),
+    resolveAttempts: () => attempts,
+    launchWorker: async ({ attempt }) => {
+      seen.push(attempt.model);
+      const error = new Error("worker process was not reaped");
+      error.code = "PROCESS_NOT_REAPED";
+      throw error;
+    },
+  }), (error) => error.code === "PROCESS_NOT_REAPED");
+
+  assert.deepEqual(seen, ["local"]);
+});

@@ -52,7 +52,7 @@
         <ul class="hero-facts" aria-label="Operating facts">
           <li><strong>Local first</strong><span>when a free candidate is qualified</span></li>
           <li><strong>Role scoped</strong><span>a failure does not exile a model</span></li>
-          <li><strong>One attempt</strong><span>no hidden retry loop</span></li>
+          <li><strong>Once per route</strong><span>fallbacks are previewed up front</span></li>
         </ul>
       </div>
 
@@ -84,7 +84,7 @@
             </tbody>
           </table>
         </div>
-        <p class="board-note">This board is illustrative, not a host qualification claim. Runtime routing uses the latest private record for a SHA-256 fingerprint over candidate ID, runtime and adapter versions, capabilities, model digest when available, tier, reasoning effort, and the complete role harness.</p>
+        <p class="board-note">This board is illustrative, not a host qualification claim. Runtime routing uses the latest private record for a SHA-256 fingerprint over candidate ID, runtime and adapter versions, capabilities, model digest when available, tier, reasoning effort, and the versioned role-harness identifier.</p>
       </div>
     </section>
 
@@ -142,7 +142,7 @@ Owner request: &lt;paste the prompt, specification, or plan here&gt;</code></pre
           </li>
           <li>
             <span class="step-number">05</span>
-            <div><h3>Dispatch bounded workers</h3><p>Independent non-overlapping tasks may share configured slots. Every worker is a scoped leaf with one attempt and retained receipts.</p></div>
+            <div><h3>Dispatch bounded workers</h3><p>Independent non-overlapping tasks may share configured slots. Every worker is a scoped leaf with one invocation per candidate route and retained receipts; failures advance through the previewed ladder.</p></div>
           </li>
           <li>
             <span class="step-number">06</span>

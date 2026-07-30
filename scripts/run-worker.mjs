@@ -345,6 +345,7 @@ export async function main(argv = process.argv.slice(2)) {
       exitCode: processResult.exitCode,
       timedOut: processResult.timedOut,
       error: executionError?.message ?? null,
+      errorCode: executionError?.code ?? null,
       startedAt: startedAt.toISOString(),
       finishedAt: new Date().toISOString(),
       usage,

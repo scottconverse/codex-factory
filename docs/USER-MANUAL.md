@@ -103,7 +103,10 @@ format.
 
 Intake rejects tracked uncommitted changes. It does not stash, reset, or
 silently include owner work in the campaign's `HEAD` base; preserve that work
-and use a clean worktree for the campaign.
+and use a clean worktree for the campaign. Intake resolves the selected base to
+the exact current commit. Campaign preview and execution refuse if tracked
+files change or `HEAD` advances afterward; create a fresh intake so the private
+plan is based on the repository state that will actually run.
 
 The coordinator then writes the plan and runs `scripts/run-campaign.mjs` in
 dry-run mode before adding `--execute`.
@@ -112,8 +115,10 @@ Each internal task declares `readPaths`, `writePaths`, dependencies, one check, 
 `parallelSafe`. The plan rejects undeclared parallel read/write or write/write
 overlap, so only genuinely independent work shares a wave. Each task uses one
 current qualified local attempt with a short wall-clock limit. On failure, the
-coordinator explicitly tries `gpt-5.6-luna`, then `gpt-5.6-terra`, provided the
-exact candidate is qualified and paid admission succeeds. A campaign stays
+campaign automatically advances through the reviewed local, Luna, and Terra
+ladder, provided each exact candidate is qualified and paid admission succeeds.
+`--execute` authorizes that displayed ladder; each candidate is invoked at most
+once. A campaign stays
 dry-run unless `--execute` is supplied. Execution uses isolated worker and
 integration worktrees, retains receipts below `.codex-factory/campaigns/`, and
 leaves the accepted integration branch for owner inspection; it never merges
@@ -158,7 +163,8 @@ Ollama discovery inventories every installed model. Embedding-only models remain
 visible but do not enter the subagent harness. Each result is bound to a
 SHA-256 fingerprint over the candidate ID (provider and model), runtime version,
 adapter version, declared capabilities, immutable model digest when the runtime
-provides one, tier, reasoning effort, and the complete role harness. A failed
+provides one, tier, reasoning effort, and the versioned role-harness
+identifier. A failed
 structured-write qualification does not erase a passing analysis qualification.
 Mutating admission also requires the candidate to pass a derived structured-
 reasoning benchmark; a protocol-only write response is insufficient. Current
@@ -251,8 +257,10 @@ node scripts/run-worker.mjs `
   --execute
 ```
 
-Task IDs are single-use after reservation. The runner does not retry
-automatically.
+Task IDs are single-use after reservation. This standalone worker runner does
+not retry automatically. The campaign runner instead creates one unique worker
+task ID for each candidate route and advances through only the ladder shown in
+its dry-run preview.
 
 ## Run a constrained local patch
 
@@ -328,7 +336,8 @@ The initial configuration permits:
 
 - 250,000 aggregate paid tokens;
 - one to four configured worker slots;
-- one attempt per task;
+- one invocation per candidate route (a campaign task may advance through its
+  previewed local, Luna, and Terra ladder);
 - 30 minutes per worker.
 
 Reservations are written under the worker lock before launch and reconciled
@@ -369,7 +378,8 @@ Edit `factory.config.json` deliberately. Validation requires:
 
 - a positive aggregate allowance for metered OpenAI/Codex candidates;
 - a positive wall-clock limit for each qualification;
-- exactly one attempt per task and one to four concurrent worker slots;
+- exactly one invocation per worker task ID and one to four concurrent worker
+  slots; a campaign uses a distinct worker task ID for each previewed route;
 - known role qualifications, tiers, sandboxes, and reasoning efforts;
 - a token reservation for every configured metered Codex candidate;
 - runtime discovery, rather than a fixed Ollama allowlist.
@@ -395,8 +405,9 @@ creates the JSON privately under Factory-owned ignored state.
 The latest record for the exact role fingerprint controls admission. That
 fingerprint hashes the candidate ID (provider and model), runtime version,
 adapter version, declared capabilities, immutable model digest when available,
-tier, reasoning effort, and the complete role harness. Tracked model ladders and
-bakeoff ledgers are historical evidence, not runtime allowlists. Qualification
+tier, reasoning effort, and the versioned role-harness identifier. Tracked
+model ladders and bakeoff ledgers are historical evidence, not runtime
+allowlists. Qualification
 records and receipts remain private because they may contain host and task
 details; the public site therefore makes no claim that a named model is
 currently qualified on your host.

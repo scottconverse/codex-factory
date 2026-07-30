@@ -23,8 +23,9 @@ process tree, and retains selection and execution evidence.
   discovers an existing repository or safely bootstraps an empty one, then
   creates its dependency plan internally;
 - dry-run by default, with up to four explicitly declared non-overlapping workers;
-- one qualified local attempt first, then explicit Luna and Terra fallbacks;
-- single-use task IDs and no automatic retries;
+- one invocation per candidate route: qualified local first, then Luna and
+  Terra when the reviewed ladder is qualified and paid admission succeeds;
+- single-use worker task IDs and no retry of the same candidate route;
 - lock-scoped aggregate budget admission and durable reservations;
 - wall-clock timeout, interrupt handling, and owned process-tree cleanup;
 - JSONL events, stderr, final-message, result, and usage receipts;
@@ -80,11 +81,14 @@ node scripts/coordinator-intake.mjs --repository C:\work\my-project --prompt "Ad
 The intake produces a private source and a reserved internal plan path below
 Factory's `.codex-factory/coordinator/` state, without writing coordinator
 state into the target repository. The coordinator carries the source text in
-its internal plan, then previews
-and executes `run-campaign`. Tasks can share a batch only when their paths do
+its internal plan and pins the inspected `HEAD` commit. Preview and execution
+refuse tracked owner edits or a different `HEAD`; create a fresh intake instead
+of silently running a stale plan. Tasks can share a batch only when their paths do
 not overlap in either direction. Each task first uses one qualified local model;
-a fast local failure falls back to `gpt-5.6-luna`, then `gpt-5.6-terra`, when
-those exact routes are currently qualified and admitted by the paid ledger.
+a fast local failure automatically advances through the reviewed local, Luna,
+and Terra ladder, when those exact routes are currently qualified and admitted
+by the paid ledger. `--execute` authorizes that displayed ladder; each candidate
+is invoked at most once.
 Execution creates an isolated integration worktree and never merges it into the
 owner branch automatically.
 
@@ -128,7 +132,8 @@ Candidate availability is discovered rather than hardcoded. Qualification is
 role scoped: a model may qualify for analysis and fail structured writes without
 being removed from the fleet. The current host must qualify the exact candidate
 ID, runtime and adapter versions, capabilities, model digest when available,
-tier, reasoning effort, and role harness before routing begins. Those
+tier, reasoning effort, and versioned role-harness identifier before routing
+begins. Those
 host-specific records remain private; tracked examples are not runtime
 allowlists.
 

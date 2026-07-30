@@ -33,3 +33,8 @@ test("mobile navigation starts at 840px and visible links have 44px hit targets"
     assert.match(css, new RegExp(`${escaped}[^}]*min-height:\\s*44px`, "i"), `${selector} needs a 44px mobile hit height`);
   }
 });
+
+test("desktop roster metrics can shrink without clipping their labels", () => {
+  assert.match(css, /\.board-metrics\s*\{[^}]*grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/s);
+  assert.match(css, /\.board-metrics strong\s*\{[^}]*overflow-wrap:\s*anywhere/s);
+});

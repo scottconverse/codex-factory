@@ -501,6 +501,15 @@ export async function main(argv = process.argv.slice(2)) {
     } finally {
       terminalLock.release();
     }
+    if (cleanupError) {
+      const cleanupFailure = new AggregateError(
+        [error, new Error(`Local patch cleanup failed: ${cleanupError}`)],
+        "Local patch and cleanup failed",
+      );
+      cleanupFailure.code = "WORKER_CLEANUP_FAILED";
+      throw cleanupFailure;
+    }
+    error.code ??= "WORKER_ATTEMPT_FAILED";
     throw error;
   } finally {
     slot.release();
@@ -508,5 +517,14 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch(reportCliError);
+  main().catch((error) => {
+    if (["WORKER_ATTEMPT_FAILED", "WORKER_CLEANUP_FAILED"].includes(error.code)) {
+      process.stdout.write(`${JSON.stringify({
+        status: "failed",
+        error: error.message,
+        errorCode: error.code,
+      })}\n`);
+    }
+    reportCliError(error);
+  });
 }

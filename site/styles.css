@@ -236,12 +236,12 @@ h3 { font-size: 20px; }
 .board-state i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; background: #61b88b; border-radius: 50%; }
 .board-metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   border-bottom: 1px solid #2d3e37;
 }
 .board-metrics div { min-height: 112px; padding: 20px 15px; border-right: 1px solid #2d3e37; }
 .board-metrics div:last-child { border: 0; }
-.board-metrics strong { display: block; color: #f18a62; font: 500 34px/1 Georgia, serif; }
+.board-metrics strong { display: block; color: #f18a62; font: 500 30px/1 Georgia, serif; overflow-wrap: anywhere; }
 .board-metrics span { display: block; margin-top: 9px; color: #9aaca4; font-size: 12px; line-height: 1.4; }
 .candidate-scroll { overflow-x: auto; padding: 10px 22px 12px; }
 .candidate-scroll-hint { display: none; }

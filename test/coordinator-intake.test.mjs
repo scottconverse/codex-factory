@@ -25,7 +25,8 @@ test("createCoordinatorIntake copies an owner prompt into an existing repository
 
   assert.equal(intake.campaignId, "build-cli");
   assert.equal(intake.repository, repository);
-  assert.equal(intake.base, "HEAD");
+  assert.match(intake.base, /^[0-9a-f]{40}$/);
+  assert.equal(intake.base, spawnSync("git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).stdout.trim());
   assert.match(intake.sourcePath, /\.codex-factory[\\/]coordinator[\\/]\w+-build-cli[\\/]source\.md$/);
   assert.match(intake.planFile, /\.codex-factory[\\/]coordinator[\\/]\w+-build-cli[\\/]campaign\.json$/);
   assert.equal(readFileSync(intake.sourcePath, "utf8"), "Build a small command line tool with tests.\n");
@@ -117,6 +118,9 @@ test("createCoordinatorIntake does not mutate a hard-linked Git exclude file in 
   const repository = path.join(parent, "repository");
   const outside = path.join(parent, "outside-exclude");
   assert.equal(spawnSync("git", ["init", repository], { encoding: "utf8" }).status, 0);
+  writeFileSync(path.join(repository, "owner.txt"), "owner baseline\n");
+  assert.equal(spawnSync("git", ["add", "owner.txt"], { cwd: repository, encoding: "utf8" }).status, 0);
+  assert.equal(spawnSync("git", ["-c", "user.name=Owner", "-c", "user.email=owner@local", "commit", "-m", "owner baseline"], { cwd: repository, encoding: "utf8" }).status, 0);
   writeFileSync(outside, "outside\n");
   const exclude = path.join(repository, ".git", "info", "exclude");
   unlinkSync(exclude);

@@ -142,13 +142,37 @@ test("runTaskWithFallback stops after Luna succeeds", async () => {
     ],
     executeAttempt: async (_task, attempt) => {
       seen.push(attempt.model);
-      if (attempt.provider === "ollama") throw new Error("invalid patch");
+      if (attempt.provider === "ollama") {
+        const error = new Error("invalid patch");
+        error.code = "WORKER_ATTEMPT_FAILED";
+        throw error;
+      }
       return { status: "accepted", commit: "abc123" };
     },
   });
   assert.deepEqual(seen, ["local", "gpt-5.6-luna"]);
   assert.equal(result.selected.model, "gpt-5.6-luna");
   assert.equal(result.failures.length, 1);
+});
+
+test("runTaskWithFallback aborts instead of duplicating work after a containment failure", async () => {
+  const seen = [];
+  const containment = new Error("child process 123 was not reaped");
+  containment.code = "PROCESS_NOT_REAPED";
+
+  await assert.rejects(() => runTaskWithFallback({
+    task: campaign().tasks[0],
+    attempts: [
+      { provider: "ollama", model: "local" },
+      { provider: "openai", model: "gpt-5.6-luna" },
+    ],
+    executeAttempt: async (_task, attempt) => {
+      seen.push(attempt.model);
+      throw containment;
+    },
+  }), (error) => error === containment);
+
+  assert.deepEqual(seen, ["local"]);
 });
 
 test("runCampaignSchedule overlaps independent tasks and serializes their dependent", async () => {
@@ -169,4 +193,22 @@ test("runCampaignSchedule overlaps independent tasks and serializes their depend
   assert.equal(peak, 2);
   assert.deepEqual(integrated, [["api", "ui"], ["integration"]]);
   assert.equal(result.status, "completed");
+});
+
+test("runCampaignSchedule waits for every parallel task to settle before failing the batch", async () => {
+  const plan = validateCampaign(campaign());
+  let siblingSettled = false;
+
+  await assert.rejects(() => runCampaignSchedule({
+    plan,
+    executeTask: async (task) => {
+      if (task.id === "api") throw new Error("api failed");
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      siblingSettled = true;
+      return { taskId: task.id, commit: `${task.id}-commit` };
+    },
+    integrateBatch: async () => assert.fail("a failed batch must not integrate"),
+  }), /api failed/);
+
+  assert.equal(siblingSettled, true);
 });

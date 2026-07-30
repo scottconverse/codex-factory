@@ -168,10 +168,13 @@ export async function runTaskWithFallback({ task, attempts, executeAttempt }) {
     try {
       const result = await executeAttempt(task, attempt);
       if (!result || !["accepted", "process_completed"].includes(result.status)) {
-        throw new Error(`attempt ended with ${result?.status ?? "no result"}`);
+        const error = new Error(`attempt ended with ${result?.status ?? "no result"}`);
+        error.code = "WORKER_ATTEMPT_FAILED";
+        throw error;
       }
       return { taskId: task.id, selected: attempt, result, commit: result.commit ?? null, failures };
     } catch (error) {
+      if (error.code !== "WORKER_ATTEMPT_FAILED") throw error;
       failures.push({ provider: attempt.provider, model: attempt.model, error: error.message });
     }
   }
@@ -190,7 +193,10 @@ export async function runCampaignSchedule({ plan, executeTask, integrateBatch })
     for (const task of batch) running.add(task.id);
     let batchResults;
     try {
-      batchResults = await Promise.all(batch.map((task) => executeTask(task)));
+      const settled = await Promise.allSettled(batch.map((task) => executeTask(task)));
+      const failed = settled.find((result) => result.status === "rejected");
+      if (failed) throw failed.reason;
+      batchResults = settled.map((result) => result.value);
     } finally {
       for (const task of batch) running.delete(task.id);
     }

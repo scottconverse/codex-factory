@@ -85,6 +85,27 @@ const mutants = [
     before: "      : await runChild(workerCommand, workerArgs, ROOT, activeChildren);",
     after: '      : await Promise.resolve({ status: "process_completed" });',
   },
+  {
+    name: "campaign-parallel-failure-does-not-wait-for-siblings",
+    file: "scripts/factory-campaign.mjs",
+    command: ["--test", "test/factory-campaign.test.mjs"],
+    before: "const settled = await Promise.allSettled(batch.map((task) => executeTask(task)));",
+    after: "const settled = (await Promise.all(batch.map((task) => executeTask(task)))).map((value) => ({ status: \"fulfilled\", value }));",
+  },
+  {
+    name: "campaign-containment-failure-falls-through",
+    file: "scripts/factory-campaign.mjs",
+    command: ["--test", "test/factory-campaign.test.mjs"],
+    before: '      if (error.code !== "WORKER_ATTEMPT_FAILED") throw error;',
+    after: '      if (false) throw error;',
+  },
+  {
+    name: "campaign-repository-snapshot-check-is-skipped",
+    file: "scripts/run-campaign.mjs",
+    command: ["--test", "test/run-campaign.e2e.test.mjs"],
+    before: "  assertRepositorySnapshot(repository, plan.base);",
+    after: "  void plan.base;",
+  },
 ];
 
 for (const mutant of mutants) {

@@ -35,6 +35,9 @@ internal task plan. Never ask the owner to write Factory JSON.
    define acceptance criteria, minimal read/write scope, one runnable check,
    dependencies, and whether it can safely run in parallel. Keep architecture,
    integration, acceptance, and user communication in this top-level session.
+   Treat the intake's immutable base commit as the inspected snapshot. If
+   tracked files or `HEAD` change, stop and create a fresh intake rather than
+   reusing a stale plan.
 4. Read the intake's `sourcePath`, then write the internal valid campaign plan
    to its `planFile` with that text in the plan's `source` field. Do not
    dispatch `critical` work through the campaign: retain it in the coordinator
@@ -55,9 +58,10 @@ write paths, a command/argument array, wall time, context/output safety limits,
 and commit message. The runner selects any current structured-write-qualified
 local candidate; an optional model field is a qualified override, not the pool.
 
-Do not treat local token telemetry as spend admission. Do not retry a failed
-task automatically or let the coordinator duplicate work while the worker is
-running.
+Do not treat local token telemetry as spend admission. Do not retry the same
+candidate route or let the coordinator duplicate work while a worker is
+running. A reviewed campaign may automatically advance once through its
+previewed local, Luna, and Terra ladder.
 
 ## Stop
 

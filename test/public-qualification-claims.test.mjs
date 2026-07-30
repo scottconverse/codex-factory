@@ -24,8 +24,16 @@ test("operator documentation names every field in the admission fingerprint", ()
     "model digest",
     "tier",
     "reasoning effort",
-    "role harness",
+    "versioned role-harness identifier",
   ]) {
     assert.match(manual, new RegExp(field, "i"), `missing fingerprint field: ${field}`);
   }
+});
+
+test("public retry copy distinguishes one invocation per route from automatic fallback", () => {
+  const publicText = [read("README.md"), read("docs/USER-MANUAL.md"), read("site/index.html")].join("\n");
+
+  assert.match(publicText, /one invocation per candidate route/i);
+  assert.match(publicText, /automatically advances through the reviewed local,\s+Luna,\s+and Terra ladder/i);
+  assert.doesNotMatch(publicText, /single-use task IDs and no automatic retries/i);
 });

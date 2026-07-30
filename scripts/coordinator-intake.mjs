@@ -139,6 +139,11 @@ export function createCoordinatorIntake({ repository: target, promptFile, prompt
   const id = campaignId ?? generatedCampaignId(source);
   if (!ID_PATTERN.test(id)) throw new Error("Coordinator campaign ID is invalid");
   if (typeof base !== "string" || !base || /[\r\n]/.test(base)) throw new Error("Coordinator base is required");
+  const resolvedBase = git(["rev-parse", "--verify", "--end-of-options", `${base}^{commit}`], repository).stdout.trim();
+  const currentHead = git(["rev-parse", "HEAD"], repository).stdout.trim();
+  if (resolvedBase !== currentHead) {
+    throw new Error("Coordinator base must resolve to the repository's current HEAD");
+  }
 
   const repositoryHash = createHash("sha256").update(realpathSync(repository)).digest("hex").slice(0, 12);
   const privateId = `${repositoryHash}-${id}`;
@@ -151,7 +156,7 @@ export function createCoordinatorIntake({ repository: target, promptFile, prompt
     version: 1,
     campaignId: id,
     repository,
-    base,
+    base: resolvedBase,
     promptFile: promptFile ? path.resolve(promptFile) : null,
     sourcePath,
     planFile,
