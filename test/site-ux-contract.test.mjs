@@ -39,7 +39,7 @@ test("mobile navigation starts above 840px and visible links have 44px hit targe
   }
   assert.match(css, /\.footer-links a\s*\{[^}]*min-width:\s*44px/i);
   const desktopCss = css.split("@media")[0];
-  for (const selector of [".site-header .brand", ".nav-links > a", ".footer-links a"]) {
+  for (const selector of [".site-header .brand", ".nav-links > a", ".text-link", ".footer-links a"]) {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     assert.match(desktopCss, new RegExp(`${escaped}[^}]*min-height:\\s*44px`, "i"), `${selector} needs a 44px desktop hit height`);
     assert.match(desktopCss, new RegExp(`${escaped}[^}]*min-width:\\s*44px`, "i"), `${selector} needs a 44px desktop hit width`);

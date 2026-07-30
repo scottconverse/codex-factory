@@ -414,6 +414,7 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
 .footer-links a { min-width: 44px; font-size: 13px; text-underline-offset: 4px; }
 .site-header .brand,
 .nav-links > a,
+.text-link,
 .footer-links a {
   display: inline-flex;
   min-width: 44px;
