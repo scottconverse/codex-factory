@@ -14,6 +14,7 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { prepareDeclaredWritePath } from "./factory-process.mjs";
 import {
   buildAttemptLadder,
   remainingAttemptMs,
@@ -87,21 +88,24 @@ function pathAllowed(candidate, allowed) {
 }
 
 function assertSafeWritePaths(repository, writePaths) {
-  const root = realpathSync(repository);
-  const prefix = `${root}${path.sep}`.toLowerCase();
   for (const relative of writePaths) {
-    const candidate = path.resolve(root, relative);
-    const parent = realpathSync(path.dirname(candidate));
-    if (!parent.toLowerCase().startsWith(prefix) && parent.toLowerCase() !== root.toLowerCase()) {
-      throw new Error(`Campaign write path escapes repository through a linked parent: ${relative}`);
-    }
-    if (parent.toLowerCase() !== path.dirname(candidate).toLowerCase()) {
-      throw new Error(`Campaign write path uses a linked parent: ${relative}`);
-    }
-    if (existsSync(candidate) && lstatSync(candidate).isSymbolicLink()) {
-      throw new Error(`Campaign write path is a symbolic link: ${relative}`);
-    }
+    prepareDeclaredWritePath(repository, relative);
   }
+}
+
+function changedPaths(repository, base) {
+  return [...new Set([
+    ...git(["diff", "--name-only", base], repository).stdout.split(/\r?\n/),
+    ...git(["ls-files", "--others", "--exclude-standard"], repository).stdout.split(/\r?\n/),
+  ].filter(Boolean))];
+}
+
+function validateChangedPaths(repository, base, writePaths) {
+  assertSafeWritePaths(repository, writePaths);
+  const changed = changedPaths(repository, base);
+  const outside = changed.filter((entry) => !pathAllowed(entry, writePaths));
+  if (outside.length) throw new Error(`Worker changed paths outside the task contract: ${outside.join(", ")}`);
+  return changed;
 }
 
 function terminateChild(child) {
@@ -297,17 +301,17 @@ async function executeCodexAttempt({
       : await runChild(workerCommand, workerArgs, ROOT, activeChildren);
     if (worker.status !== "process_completed") throw new Error(`Worker ended with ${worker.status}`);
     assertSafeWritePaths(worktreePath, task.writePaths);
-    const changed = [
-      ...git(["diff", "--name-only", base], worktreePath).stdout.split(/\r?\n/),
-      ...git(["ls-files", "--others", "--exclude-standard"], worktreePath).stdout.split(/\r?\n/),
-    ].filter(Boolean);
-    const uniqueChanged = [...new Set(changed)];
+    let uniqueChanged = validateChangedPaths(worktreePath, base, task.writePaths);
     if (!uniqueChanged.length) throw new Error("Worker produced no repository changes");
-    const outside = uniqueChanged.filter((entry) => !pathAllowed(entry, task.writePaths));
-    if (outside.length) throw new Error(`Worker changed paths outside the task contract: ${outside.join(", ")}`);
     const check = runCheck(task, worktreePath, deadlineMs ? remainingAttemptMs(deadlineMs) : undefined);
-    git(["add", "--all"], worktreePath);
-    const staged = git(["diff", "--cached", "--name-only"], worktreePath).stdout.trim();
+    uniqueChanged = validateChangedPaths(worktreePath, base, task.writePaths);
+    if (!uniqueChanged.length) throw new Error("Required check removed all worker changes");
+    git(["reset"], worktreePath);
+    git(["add", "--all", "--", ...task.writePaths], worktreePath);
+    const stagedPaths = git(["diff", "--cached", "--name-only"], worktreePath).stdout.trim().split(/\r?\n/).filter(Boolean);
+    const staged = stagedPaths.join("\n");
+    const missing = uniqueChanged.filter((entry) => !stagedPaths.includes(entry));
+    if (missing.length) throw new Error(`Validated paths were not staged: ${missing.join(", ")}`);
     if (staged) git(["commit", "-m", task.commitMessage], worktreePath);
     const commit = git(["rev-parse", "HEAD"], worktreePath).stdout.trim();
     if (commit === base) throw new Error("Worker changes did not produce a commit");

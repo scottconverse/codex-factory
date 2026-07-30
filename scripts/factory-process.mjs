@@ -1,5 +1,33 @@
 import { spawn, spawnSync } from "node:child_process";
+import { existsSync, lstatSync, mkdirSync, realpathSync, statSync } from "node:fs";
+import path from "node:path";
 import process from "node:process";
+
+export function prepareDeclaredWritePath(repository, relativePath) {
+  const root = realpathSync(repository);
+  const rootLower = root.toLowerCase();
+  const segments = relativePath.replaceAll("\\", "/").split("/");
+  let current = root;
+  for (const segment of segments.slice(0, -1)) {
+    current = path.join(current, segment);
+    if (existsSync(current)) {
+      if (lstatSync(current).isSymbolicLink()) throw new Error(`Write path uses a symbolic link component: ${relativePath}`);
+      if (!statSync(current).isDirectory()) throw new Error(`Write path parent is not a directory: ${relativePath}`);
+    } else {
+      mkdirSync(current);
+    }
+    const actual = realpathSync(current);
+    if (actual.toLowerCase() !== current.toLowerCase()
+      || (actual.toLowerCase() !== rootLower && !actual.toLowerCase().startsWith(`${rootLower}${path.sep}`))) {
+      throw new Error(`Write path uses a linked parent: ${relativePath}`);
+    }
+  }
+  const candidate = path.join(root, ...segments);
+  if (existsSync(candidate) && lstatSync(candidate).isSymbolicLink()) {
+    throw new Error(`Write path is a symbolic link: ${relativePath}`);
+  }
+  return candidate;
+}
 
 function terminateProcessTree(child) {
   if (!child.pid || child.exitCode !== null) return;
@@ -54,6 +82,8 @@ export async function superviseProcess({
       reapTimer = setTimeout(() => {
         const error = new Error(`Process tree was not reaped within ${reapDeadlineMs}ms after ${reason}`);
         error.code = "PROCESS_NOT_REAPED";
+        error.childPid = child.pid ?? null;
+        error.processGroup = child.pid == null ? null : (process.platform === "win32" ? child.pid : -child.pid);
         rejectUnreaped(error);
       }, reapDeadlineMs);
     }

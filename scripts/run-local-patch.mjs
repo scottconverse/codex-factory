@@ -17,6 +17,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
 import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
 import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
+import { prepareDeclaredWritePath } from "./factory-process.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const USAGE = `Usage:
@@ -207,17 +208,8 @@ function resolveExistingFile(repository, relativePath) {
 }
 
 function resolveWritableFile(repository, relativePath) {
-  const candidate = path.resolve(repository, relativePath);
-  const lexicalParent = path.dirname(candidate);
-  const parent = realpathSync(lexicalParent);
-  const root = realpathSync(repository);
-  const rootPrefix = `${root}${path.sep}`.toLowerCase();
-  if (parent.toLowerCase() !== root.toLowerCase() && !parent.toLowerCase().startsWith(rootPrefix)) {
-    throw new Error(`Write path escapes repository through a link: ${relativePath}`);
-  }
-  if (parent.toLowerCase() !== lexicalParent.toLowerCase()) throw new Error(`Write path uses a linked parent: ${relativePath}`);
+  const candidate = prepareDeclaredWritePath(repository, relativePath);
   if (existsSync(candidate)) {
-    if (lstatSync(candidate).isSymbolicLink()) throw new Error(`Write path is a symbolic link: ${relativePath}`);
     resolveExistingFile(repository, relativePath);
   }
   return candidate;
@@ -410,6 +402,7 @@ export async function main(argv = process.argv.slice(2)) {
       ledgerLock.release();
     }
     git(["worktree", "add", "-b", branch, worktreePath, task.base], repository);
+    for (const writePath of task.writePaths) resolveWritableFile(worktreePath, writePath);
     const prompt = buildPrompt(task, worktreePath);
     const request = buildOllamaRequest({ task, prompt });
     writeFileSync(path.resolve(runPath, "request.json"), `${JSON.stringify({ ...preview, execute: true, runId, worktreePath, branch, taskFile, prompt }, null, 2)}\n`);
@@ -425,19 +418,29 @@ export async function main(argv = process.argv.slice(2)) {
       writeFileSync(resolveWritableFile(worktreePath, file.path), file.content);
       git(["add", "--", file.path], worktreePath);
     }
-    const changedPaths = generatedFiles.map((file) => file.path);
+    let changedPaths = generatedFiles.map((file) => file.path);
     const stagedPaths = git(["diff", "--cached", "--name-only"], worktreePath).stdout.trim().split(/\r?\n/).filter(Boolean);
     if (JSON.stringify(stagedPaths.sort()) !== JSON.stringify([...changedPaths].sort())) {
       throw new Error("Staged paths differ from the validated generated files");
     }
-    writeFileSync(path.resolve(runPath, "candidate.patch"), git(["diff", "--cached", "--binary"], worktreePath).stdout);
     const check = await runCheck(task.check, worktreePath, remainingAttemptMs(deadlineMs));
     writeFileSync(path.resolve(runPath, "check.json"), `${JSON.stringify(check, null, 2)}\n`);
     if (check.timedOut || check.exitCode !== 0) throw new Error(`Required check failed with exit ${check.exitCode}`);
-    validateCheckWorkspace(
-      git(["diff", "--name-only"], worktreePath).stdout.trim().split(/\r?\n/).filter(Boolean),
-      git(["ls-files", "--others", "--exclude-standard"], worktreePath).stdout.trim().split(/\r?\n/).filter(Boolean),
-    );
+    changedPaths = [...new Set([
+      ...git(["diff", "--name-only", task.base], worktreePath).stdout.trim().split(/\r?\n/),
+      ...git(["ls-files", "--others", "--exclude-standard"], worktreePath).stdout.trim().split(/\r?\n/),
+    ].filter(Boolean))];
+    const outside = changedPaths.filter((entry) => !task.writePaths.some((allowed) =>
+      entry === allowed || entry.startsWith(`${allowed}/`)));
+    if (outside.length) throw new Error(`Required check changed paths outside allowed write paths: ${outside.join(", ")}`);
+    for (const changedPath of changedPaths) resolveWritableFile(worktreePath, changedPath);
+    git(["reset"], worktreePath);
+    git(["add", "--all", "--", ...task.writePaths], worktreePath);
+    const finalStagedPaths = git(["diff", "--cached", "--name-only"], worktreePath).stdout.trim().split(/\r?\n/).filter(Boolean);
+    if (JSON.stringify(finalStagedPaths.sort()) !== JSON.stringify([...changedPaths].sort())) {
+      throw new Error("Staged paths differ from the validated post-check files");
+    }
+    writeFileSync(path.resolve(runPath, "candidate.patch"), git(["diff", "--cached", "--binary"], worktreePath).stdout);
     git(["commit", "-m", task.commitMessage], worktreePath);
     const commit = git(["rev-parse", "HEAD"], worktreePath).stdout.trim();
     const result = {

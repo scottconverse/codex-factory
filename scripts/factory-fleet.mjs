@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
+import { existsSync, statSync } from "node:fs";
+import path from "node:path";
 
 export const QUALIFICATION_HARNESSES = Object.freeze({
   analysis: "analysis-exact-artifact-v1",
@@ -44,10 +46,32 @@ function normalizeOpenAiCandidate(value) {
 }
 
 let detectedCodexRuntimeVersion;
+export function codexLauncher(env = process.env) {
+  if (Object.hasOwn(env, "CODEX_FACTORY_CODEX_SHIM")) {
+    const configured = env.CODEX_FACTORY_CODEX_SHIM;
+    if (typeof configured !== "string" || !configured.trim()) {
+      throw new Error("CODEX_FACTORY_CODEX_SHIM must be a nonempty file path");
+    }
+    const shim = path.resolve(configured);
+    if (!existsSync(shim) || !statSync(shim).isFile()) {
+      throw new Error(`CODEX_FACTORY_CODEX_SHIM is not a file: ${shim}`);
+    }
+    return { command: process.execPath, argsPrefix: [shim] };
+  }
+  if (Object.hasOwn(env, "CODEX_FACTORY_CODEX_COMMAND")) {
+    const override = env.CODEX_FACTORY_CODEX_COMMAND;
+    if (typeof override !== "string" || !override.trim()) {
+      throw new Error("CODEX_FACTORY_CODEX_COMMAND must be a nonempty executable path");
+    }
+    return { command: override, argsPrefix: [] };
+  }
+  return { command: process.platform === "win32" ? "codex.exe" : "codex", argsPrefix: [] };
+}
+
 export function detectCodexRuntimeVersion() {
   if (detectedCodexRuntimeVersion) return detectedCodexRuntimeVersion;
-  const command = process.platform === "win32" ? "codex.exe" : "codex";
-  const result = spawnSync(command, ["--version"], { encoding: "utf8", windowsHide: true });
+  const { command, argsPrefix } = codexLauncher();
+  const result = spawnSync(command, [...argsPrefix, "--version"], { encoding: "utf8", windowsHide: true });
   const text = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
   detectedCodexRuntimeVersion = result.status === 0 && text ? text : "codex-cli-unavailable";
   return detectedCodexRuntimeVersion;
@@ -61,6 +85,7 @@ export function parseOllamaDiscovery(versionPayload, tagsPayload) {
     .filter((item) => typeof item?.name === "string" && item.name.trim())
     .map((item) => ({
       name: item.name,
+      ...(typeof item.digest === "string" && item.digest.trim() ? { digest: item.digest } : {}),
       capabilities: Array.isArray(item.capabilities)
         ? item.capabilities.filter((capability) => typeof capability === "string")
         : [],
@@ -113,6 +138,9 @@ export function discoverCandidatePool({ config, ollama }) {
       paid: false,
       tokenReservation: null,
       capabilities: typeof value === "string" ? [] : value.capabilities ?? [],
+      ...(typeof value === "object" && typeof value.digest === "string" && value.digest.trim()
+        ? { digest: value.digest }
+        : {}),
     };
   });
   const openai = (config?.candidates?.openai ?? []).map(normalizeOpenAiCandidate);
@@ -127,6 +155,7 @@ export function candidateFingerprint(candidate, role) {
     runtimeVersion: candidate.runtimeVersion,
     adapterVersion: candidate.adapterVersion,
     capabilities: candidate.capabilities ?? [],
+    digest: candidate.digest ?? null,
     tier: candidate.tier,
     reasoningEffort: candidate.reasoningEffort,
     harness,
@@ -148,6 +177,7 @@ export function qualificationPlan(candidates) {
       role,
       harness: QUALIFICATION_HARNESSES[role],
       fingerprint: candidateFingerprint(candidate, role),
+      ...(candidate.digest ? { digest: candidate.digest } : {}),
     }));
   });
 }

@@ -29,6 +29,10 @@ jobs:
         run: npm run test:coverage
       - name: Prove critical tests kill known defects
         run: npm run test:mutation
+      - name: Build website
+        run: npm run site:build
+      - name: Check website
+        run: npm run site:check
 
   build-pages:
     if: github.event_name != 'pull_request'

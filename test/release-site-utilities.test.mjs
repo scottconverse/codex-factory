@@ -96,7 +96,7 @@ test("release validation prints a concise expected failure without a stack", () 
   assert.doesNotMatch(result.stderr, /\n\s+at /);
 });
 
-test("site build synchronizes a version-bearing social card and site check validates it", () => {
+test("site validation updates stale versioned cards and intentionally permits an evergreen card", () => {
   const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-site-"));
   mkdirSync(path.join(fixture, "scripts"));
   mkdirSync(path.join(fixture, "site"));
@@ -121,7 +121,8 @@ test("site build synchronizes a version-bearing social card and site check valid
   assert.doesNotMatch(stale.stderr, /\n\s+at /);
 
   writeFileSync(path.join(fixture, "dist", "social-card.svg"), "<svg><text>Codex Factory</text></svg>\n");
-  assert.equal(run(path.join(fixture, "scripts", "check-site.mjs"), [], { cwd: fixture }).status, 0);
+  const evergreen = run(path.join(fixture, "scripts", "check-site.mjs"), [], { cwd: fixture });
+  assert.equal(evergreen.status, 0, "an evergreen social card intentionally carries no release version");
 });
 
 function request(port, method) {

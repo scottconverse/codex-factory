@@ -11,6 +11,7 @@ import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { reconcilePaidUsage, reservePaidUsage } from "./factory-admission.mjs";
 import { superviseProcess } from "./factory-process.mjs";
+import { codexLauncher } from "./factory-fleet.mjs";
 import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
 import { summarizeUsage } from "./run-worker.mjs";
 import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
@@ -89,8 +90,8 @@ export function validateSmokeArtifact(taskId, text) {
 
 export function buildSmokeInvocation({ provider, model, reasoningEffort, outputPath }) {
   if (!["ollama", "openai"].includes(provider)) throw new Error(`Unsupported provider: ${provider}`);
-  const command = process.platform === "win32" ? "codex.exe" : "codex";
-  const args = ["exec"];
+  const { command, argsPrefix } = codexLauncher();
+  const args = [...argsPrefix, "exec"];
   if (provider === "ollama") args.push("--oss", "--local-provider", "ollama");
   args.push(
     "-m", model,
@@ -180,7 +181,7 @@ async function runWorker({
     error = caught.message;
     if (caught.code === "PROCESS_NOT_REAPED") {
       preserveSlot = true;
-      slot.quarantine({ taskId, invocationId, reason: "fleet-smoke-not-reaped" });
+      slot.quarantine({ taskId, invocationId, childPid: caught.childPid, processGroup: caught.processGroup, reason: "fleet-smoke-not-reaped" });
     }
   }
   const finishedAtMs = Date.now();

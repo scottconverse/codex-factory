@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   discoverCandidatePool,
   discoverOllama,
+  codexLauncher,
   qualificationPlan,
 } from "./factory-fleet.mjs";
 import { reconcilePaidUsage, reservePaidUsage } from "./factory-admission.mjs";
@@ -213,7 +214,9 @@ async function qualifyCodex(item, timeoutMs, receiptPath) {
     : item.role === "benchmark"
       ? localRequest(item).prompt
       : `Create ${WRITE_PATH} with complete content exactly ${JSON.stringify(WRITE_CONTENT)}. Do not change any other file.`;
+  const { command, argsPrefix } = codexLauncher();
   const args = [
+    ...argsPrefix,
     "exec",
     "-m", item.model,
     "-c", `model_reasoning_effort="${item.reasoningEffort}"`,
@@ -241,7 +244,7 @@ async function qualifyCodex(item, timeoutMs, receiptPath) {
   let processError = null;
   try {
     processResult = await superviseProcess({
-      command: process.platform === "win32" ? "codex.exe" : "codex",
+      command,
       args,
       cwd: fixture,
       prompt,
@@ -308,9 +311,9 @@ export async function main(argv = process.argv.slice(2)) {
   const preview = {
     execute: options.execute,
     includePaid: options.includePaid,
-    discoveredCandidates: candidates.map(({ id, provider, model, tier, runtimeVersion }) => ({ id, provider, model, tier, runtimeVersion })),
+    discoveredCandidates: candidates.map(({ id, provider, model, tier, runtimeVersion, digest }) => ({ id, provider, model, tier, runtimeVersion, digest })),
     qualificationCount: plan.length,
-    qualifications: plan.map(({ candidateId, provider, model, role, harness, fingerprint }) => ({ candidateId, provider, model, role, harness, fingerprint })),
+    qualifications: plan.map(({ candidateId, provider, model, role, harness, fingerprint, digest }) => ({ candidateId, provider, model, role, harness, fingerprint, digest })),
     deferredPaidQualifications: completePlan.filter((item) => item.provider === "openai" && !options.includePaid).length,
   };
   if (!options.execute) {
@@ -363,7 +366,7 @@ export async function main(argv = process.argv.slice(2)) {
     } catch (error) {
       if (error.code === "PROCESS_NOT_REAPED" && slot) {
         preserveSlot = true;
-        slot.quarantine({ taskId, invocationId, reason: "qualification-not-reaped" });
+        slot.quarantine({ taskId, invocationId, childPid: error.childPid, processGroup: error.processGroup, reason: "qualification-not-reaped" });
       }
       result = { passed: false, detail: error.message, durationMs: 0, usage: null };
       if (receiptPath) {
@@ -388,6 +391,7 @@ export async function main(argv = process.argv.slice(2)) {
       role: item.role,
       harness: item.harness,
       fingerprint: item.fingerprint,
+      digest: item.digest ?? null,
       passed: result.passed,
       detail: result.detail,
       durationMs: result.durationMs,

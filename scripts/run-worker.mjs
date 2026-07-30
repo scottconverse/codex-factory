@@ -10,11 +10,12 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
+import { codexLauncher, discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
 import { acquireWorkerSlot } from "./factory-slots.mjs";
 import {
   reconcilePaidUsage,
   reservePaidUsage,
+  reserveUnpaidTaskUsage,
   summarizeLedger,
   usageSpent,
 } from "./factory-admission.mjs";
@@ -114,8 +115,8 @@ export function resolveRouteCandidate({ config, role, candidates, qualifications
 }
 
 export function buildInvocation({ route, cwd, outputPath }) {
-  const command = process.platform === "win32" ? "codex.exe" : "codex";
-  const args = ["exec"];
+  const { command, argsPrefix } = codexLauncher();
+  const args = [...argsPrefix, "exec"];
   if (route.provider === "ollama") args.push("--oss", "--local-provider", "ollama");
   args.push(
     "-m", route.model,
@@ -274,7 +275,12 @@ export async function main(argv = process.argv.slice(2)) {
       });
       ({ invocationId, spent: lockedSpent, remaining: lockedRemaining } = admission);
     } else {
-      if (taskWasAttempted(ledgerPath, options.taskId)) throw new Error(`Task ${options.taskId} already has an attempt`);
+      const admission = await reserveUnpaidTaskUsage({
+        stateRoot,
+        taskId: options.taskId,
+        metadata: { role: options.role, provider: route.provider, model: route.model },
+      });
+      invocationId = admission.invocationId;
       lockedSpent = null;
       lockedRemaining = null;
     }
@@ -291,12 +297,6 @@ export async function main(argv = process.argv.slice(2)) {
       writeFileSync(path.join(runPath, "request.json"), `${JSON.stringify({ ...executionPreview, args: exactInvocation.args, promptPath, startedAt: startedAt.toISOString() }, null, 2)}\n`);
       writeFileSync(eventsPath, "");
       writeFileSync(stderrPath, "");
-      if (!route.paid) appendFileSync(ledgerPath, `${JSON.stringify({
-        stage: "reserved", invocationId: runId, runId, taskId: options.taskId, role: options.role,
-        provider: route.provider, model: route.model, paid: false, reservedTokens: null,
-        startedAt: startedAt.toISOString(),
-      })}\n`);
-
     let processResult;
     let executionError = null;
     try {
@@ -312,7 +312,13 @@ export async function main(argv = process.argv.slice(2)) {
       processResult = { exitCode: null, timedOut: false, interrupted: null };
       if (error.code === "PROCESS_NOT_REAPED") {
         preserveLock = true;
-        slot.quarantine({ taskId: options.taskId, runId, reason: "worker-not-reaped" });
+        slot.quarantine({
+          taskId: options.taskId,
+          runId,
+          childPid: error.childPid,
+          processGroup: error.processGroup,
+          reason: "worker-not-reaped",
+        });
       }
       appendFileSync(stderrPath, `\nRunner error: ${error.message}\n`);
     }

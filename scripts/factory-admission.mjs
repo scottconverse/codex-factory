@@ -12,7 +12,9 @@ export function summarizeLedger(ledgerText, paid) {
   const legacyPending = new Map();
   let legacySequence = 0;
 
-  for (const line of ledgerText.split(/\r?\n/).filter(Boolean)) {
+  const standaloneLegacy = new Set();
+  for (const [index, line] of ledgerText.split(/\r?\n/).entries()) {
+    if (!line) continue;
     const entry = JSON.parse(line);
     if (entry.paid !== paid) continue;
     let identity = entry.invocationId;
@@ -25,7 +27,14 @@ export function summarizeLedger(ledgerText, paid) {
         legacyPending.set(key, pending);
       } else {
         const pending = legacyPending.get(key) ?? [];
-        identity = pending.shift() ?? `legacy:${key}:${legacySequence += 1}`;
+        if (pending.length) {
+          identity = pending.shift();
+        } else if (!entry.stage && !standaloneLegacy.has(key)) {
+          identity = `legacy:${key}:${legacySequence += 1}`;
+          standaloneLegacy.add(key);
+        } else {
+          throw new Error(`Ambiguous legacy usage ledger entry for task ${key || "<missing>"} at line ${index + 1}: terminal record has no matching reservation`);
+        }
       }
     }
     latestByInvocation.set(identity, entry);
@@ -43,6 +52,31 @@ export function summarizeLedger(ledgerText, paid) {
     return entry.usage.total_tokens;
   };
   return [...latestByInvocation.values()].reduce((total, entry) => total + charge(entry), 0);
+}
+
+export async function reserveUnpaidTaskUsage({ stateRoot, taskId, metadata = {} }) {
+  const ledgerPath = path.join(stateRoot, "usage.jsonl");
+  const lock = await acquireFileLock(path.join(stateRoot, "usage.lock"), { taskId, stage: "reserved", paid: false });
+  try {
+    const ledgerText = existsSync(ledgerPath) ? readFileSync(ledgerPath, "utf8") : "";
+    if (ledgerText.split(/\r?\n/).filter(Boolean).some((line) => JSON.parse(line).taskId === taskId)) {
+      throw new Error(`Task ${taskId} already has an attempt`);
+    }
+    const invocationId = createInvocationId();
+    const record = {
+      stage: "reserved",
+      invocationId,
+      taskId,
+      paid: false,
+      reservedTokens: null,
+      startedAt: new Date().toISOString(),
+      ...metadata,
+    };
+    appendFileSync(ledgerPath, `${JSON.stringify(record)}\n`);
+    return { invocationId, ledgerPath, record };
+  } finally {
+    lock.release();
+  }
 }
 
 export function usageSpent(ledgerPath, paid = true) {

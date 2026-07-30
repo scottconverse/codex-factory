@@ -1,4 +1,4 @@
-import { closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 
@@ -41,16 +41,21 @@ function reclaimDeadClaim(pathname) {
   } catch {
     return false;
   }
-  if (!Number.isSafeInteger(owner?.pid) || owner.pid < 1) return false;
-  if (owner.quarantined === true) return false;
+  const ownedPid = owner.quarantined === true ? owner.childPid : owner.pid;
+  if (!Number.isSafeInteger(ownedPid) || ownedPid < 1) return false;
   try {
-    process.kill(owner.pid, 0);
+    process.kill(ownedPid, 0);
     return false;
   } catch (error) {
     if (error.code !== "ESRCH") return false;
   }
   rmSync(pathname, { force: true });
   return true;
+}
+
+export function isContendedClaim(error, pathname, platform = process.platform) {
+  return error.code === "EEXIST"
+    || (platform === "win32" && error.code === "EPERM" && existsSync(pathname));
 }
 
 export function acquireWorkerSlot(stateRoot, maximum, metadata = {}) {
@@ -63,7 +68,7 @@ export function acquireWorkerSlot(stateRoot, maximum, metadata = {}) {
     try {
       return claim(path.join(slotRoot, `${index}.lock`), { slot: index, ...metadata });
     } catch (error) {
-      if (error.code !== "EEXIST") throw error;
+      if (!isContendedClaim(error, path.join(slotRoot, `${index}.lock`))) throw error;
       if (reclaimDeadClaim(path.join(slotRoot, `${index}.lock`))) {
         return claim(path.join(slotRoot, `${index}.lock`), { slot: index, ...metadata });
       }
@@ -80,7 +85,7 @@ export async function acquireFileLock(pathname, metadata = {}, { timeoutMs = 5_0
     try {
       return claim(resolved, metadata);
     } catch (error) {
-      if (error.code !== "EEXIST") throw error;
+      if (!isContendedClaim(error, resolved)) throw error;
       if (reclaimDeadClaim(resolved)) continue;
       if (Date.now() >= deadline) throw new Error(`Timed out waiting for lock ${resolved}`);
       await new Promise((resolve) => setTimeout(resolve, retryMs));
