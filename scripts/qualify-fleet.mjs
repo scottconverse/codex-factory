@@ -386,6 +386,13 @@ function readJsonLines(filename) {
   return readFileSync(filename, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
+export async function discoverCandidatesForOptions(config, options, discoverOllamaImpl = discoverOllama) {
+  const ollama = options.provider === "openai"
+    ? { runtimeVersion: "not-discovered", models: [] }
+    : await discoverOllamaImpl();
+  return discoverCandidatePool({ config, ollama });
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const options = parseQualificationArgs(argv);
   if (options.help) {
@@ -393,8 +400,7 @@ export async function main(argv = process.argv.slice(2)) {
     return null;
   }
   const config = JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8"));
-  const ollama = await discoverOllama();
-  const candidates = discoverCandidatePool({ config, ollama });
+  const candidates = await discoverCandidatesForOptions(config, options);
   const completePlan = qualificationPlan(candidates).map((item) => ({
     ...item,
     ...candidates.find((candidate) => candidate.id === item.candidateId),

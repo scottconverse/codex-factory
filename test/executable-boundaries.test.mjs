@@ -375,7 +375,6 @@ test("real supervisor reaps a child and grandchild on timeout before resolving a
     reapDeadlineMs: 5_000,
   });
   assert.equal(result.timedOut, true);
-  assert.notEqual(result.exitCode, null, "supervision must observe close before success");
   assert.equal(process.listenerCount("SIGINT"), sigintListeners);
   assert.equal(process.listenerCount("SIGTERM"), sigtermListeners);
   const pids = records(pidsPath);

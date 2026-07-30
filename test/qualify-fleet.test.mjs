@@ -4,12 +4,36 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {
+  discoverCandidatesForOptions,
   evaluateLocalQualification,
   filterQualificationPlan,
   parseQualificationArgs,
   removeQualificationFixture,
   withQualificationFixture,
 } from "../scripts/qualify-fleet.mjs";
+
+test("an explicit OpenAI qualification does not require a live Ollama endpoint", async () => {
+  const config = {
+    candidates: {
+      openai: [{
+        model: "gpt-5.6-luna",
+        tier: "economy",
+        reasoningEffort: "low",
+        paid: true,
+        tokenReservation: 20_000,
+        runtimeVersion: "test",
+      }],
+    },
+  };
+  const candidates = await discoverCandidatesForOptions(
+    config,
+    { provider: "openai" },
+    async () => { throw new Error("Ollama must not be contacted"); },
+  );
+  assert.deepEqual(candidates.map(({ provider, model }) => ({ provider, model })), [
+    { provider: "openai", model: "gpt-5.6-luna" },
+  ]);
+});
 
 test("qualification defaults to every candidate and keeps execution explicit", () => {
   assert.deepEqual(parseQualificationArgs([]), {
