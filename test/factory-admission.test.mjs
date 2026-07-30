@@ -8,6 +8,7 @@ import test from "node:test";
 import { summarizeLedger } from "../scripts/factory-admission.mjs";
 import { superviseProcess } from "../scripts/factory-process.mjs";
 import { isContendedClaim } from "../scripts/factory-slots.mjs";
+import { createTemporaryRoot } from "./fixtures/temporary-root.mjs";
 
 function runFixture(name, args) {
   return new Promise((resolve) => {
@@ -133,20 +134,21 @@ test("shared supervisor rejects a child tree that misses the reap deadline", asy
   );
 });
 
-test("shared supervisor terminates and reaps a real child after timeout", async () => {
+test("shared supervisor terminates and reaps a real child after timeout", async (t) => {
   let result;
-  const startedAt = Date.now();
+  const root = createTemporaryRoot(t, "codex-factory-natural-exit-");
+  const naturalExitMarker = path.join(root, "natural-exit.txt");
   await assert.doesNotReject(async () => {
     result = await superviseProcess({
       command: process.execPath,
-      args: [path.join(import.meta.dirname, "fixtures", "long-running-child.mjs")],
+      args: [path.join(import.meta.dirname, "fixtures", "long-running-child.mjs"), naturalExitMarker],
       cwd: import.meta.dirname,
       prompt: "",
       timeoutMs: 25,
       reapDeadlineMs: 2_000,
     });
   });
-  assert.ok(Date.now() - startedAt < 500, "timeout must actively terminate the child, not wait for its natural exit");
   assert.equal(result.timedOut, true);
   assert.notEqual(result.exitCode, null, "timed-out child must be reaped before supervision resolves");
+  assert.equal(existsSync(naturalExitMarker), false, "timeout must terminate the child before its natural exit");
 });

@@ -416,8 +416,10 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
 .nav-links > a,
 .footer-links a {
   display: inline-flex;
+  min-width: 44px;
   min-height: 44px;
   align-items: center;
+  justify-content: center;
 }
 
 @media (max-width: 960px) {
