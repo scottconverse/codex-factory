@@ -15,6 +15,18 @@ All notable changes to Codex Factory are documented here.
 
 - Public onboarding now starts with the owner-prompt journey and identifies
   post-`v0.1.3` coordinator work as unreleased.
+- Executed local qualifications now retain the same request, event,
+  diagnostics, timing, usage, and terminal-result evidence expected from paid
+  qualification runs.
+- Campaign acceptance checks now use owned process-tree supervision and retain
+  a dedicated check receipt.
+
+### Fixed
+
+- Windows delete-pending lock contention no longer escapes the bounded ledger
+  lock wait as a raw `EPERM`.
+- Test fixtures clean their temporary repositories and site/server state on
+  both passing and failing paths.
 
 ## [0.1.3] - 2026-07-29
 

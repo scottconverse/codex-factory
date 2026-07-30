@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn, spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, copyFileSync } from "node:fs";
 import http from "node:http";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { createTemporaryRoot } from "./fixtures/temporary-root.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const node = process.execPath;
@@ -22,8 +22,8 @@ function git(cwd, ...args) {
   return execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
 }
 
-function createReleaseFixture() {
-  const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-release-"));
+function createReleaseFixture(context) {
+  const fixture = createTemporaryRoot(context, "codex-factory-release-");
   mkdirSync(path.join(fixture, "scripts"), { recursive: true });
   mkdirSync(path.join(fixture, ".codex-plugin"), { recursive: true });
   mkdirSync(path.join(fixture, "docs"), { recursive: true });
@@ -57,8 +57,8 @@ function createReleaseFixture() {
   return fixture;
 }
 
-test("release mode binds a clean candidate to the exact v<VERSION> tag", () => {
-  const fixture = createReleaseFixture();
+test("release mode binds a clean candidate to the exact v<VERSION> tag", (t) => {
+  const fixture = createReleaseFixture(t);
   const script = path.join(fixture, "scripts", "check-release.mjs");
   assert.equal(run(script, ["--release"], { cwd: fixture }).status, 0);
 
@@ -76,8 +76,8 @@ test("release mode binds a clean candidate to the exact v<VERSION> tag", () => {
   assert.match(ahead.stderr, /exactly v0\.1\.3/i);
 });
 
-test("development release validation reports that HEAD is ahead of the version tag", () => {
-  const fixture = createReleaseFixture();
+test("development release validation reports that HEAD is ahead of the version tag", (t) => {
+  const fixture = createReleaseFixture(t);
   writeFileSync(path.join(fixture, "after-release.txt"), "new commit\n");
   git(fixture, "add", ".");
   git(fixture, "commit", "-m", "after release");
@@ -86,8 +86,8 @@ test("development release validation reports that HEAD is ahead of the version t
   assert.match(result.stdout, /HEAD is 1 commit ahead of v0\.1\.3/i);
 });
 
-test("release validation prints a concise expected failure without a stack", () => {
-  const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-release-error-"));
+test("release validation prints a concise expected failure without a stack", (t) => {
+  const fixture = createTemporaryRoot(t, "codex-factory-release-error-");
   mkdirSync(path.join(fixture, "scripts"));
   copyFileSync(path.join(root, "scripts", "check-release.mjs"), path.join(fixture, "scripts", "check-release.mjs"));
   const result = run(path.join(fixture, "scripts", "check-release.mjs"), ["--release"], { cwd: fixture });
@@ -96,8 +96,8 @@ test("release validation prints a concise expected failure without a stack", () 
   assert.doesNotMatch(result.stderr, /\n\s+at /);
 });
 
-test("site validation updates stale versioned cards and intentionally permits an evergreen card", () => {
-  const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-site-"));
+test("site validation updates stale versioned cards and intentionally permits an evergreen card", (t) => {
+  const fixture = createTemporaryRoot(t, "codex-factory-site-");
   mkdirSync(path.join(fixture, "scripts"));
   mkdirSync(path.join(fixture, "site"));
   copyFileSync(path.join(root, "scripts", "build-site.mjs"), path.join(fixture, "scripts", "build-site.mjs"));
@@ -152,18 +152,23 @@ function reserveFreePort() {
 }
 
 test("preview server permits only GET and HEAD", async (context) => {
-  const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-site-server-"));
+  let child;
+  context.after(async () => {
+    if (!child || child.exitCode !== null) return;
+    child.kill();
+    await new Promise((resolve) => child.once("exit", resolve));
+  });
+  const fixture = createTemporaryRoot(context, "codex-factory-site-server-");
   mkdirSync(path.join(fixture, "scripts"));
   mkdirSync(path.join(fixture, "dist"));
   copyFileSync(path.join(root, "scripts", "serve-site.mjs"), path.join(fixture, "scripts", "serve-site.mjs"));
   writeFileSync(path.join(fixture, "dist", "index.html"), "preview\n");
   const port = await reserveFreePort();
-  const child = spawn(node, [path.join(fixture, "scripts", "serve-site.mjs")], {
+  child = spawn(node, [path.join(fixture, "scripts", "serve-site.mjs")], {
     cwd: fixture,
     env: { ...process.env, CODEX_FACTORY_SITE_PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  context.after(() => child.kill());
   await new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("preview server did not start")), 5000);
     child.stdout.once("data", () => {

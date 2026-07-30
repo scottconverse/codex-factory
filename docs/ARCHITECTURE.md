@@ -97,7 +97,9 @@ embedding-only inventory remains visible but is not treated as a subagent.
 ### Durable local state
 
 `.codex-factory/` contains worker slots, an append-only usage ledger, campaign
-receipts, and per-run evidence. A dead-PID slot or ledger lock is reclaimed only
+receipts, qualification run bundles, and per-run evidence. Campaign acceptance
+checks use the same owned process-tree supervisor as model execution and retain
+their own check receipt. A dead-PID slot or ledger lock is reclaimed only
 by a later acquisition; live owners are never removed. The directory is
 intentionally outside version control.
 

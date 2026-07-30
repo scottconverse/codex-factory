@@ -9,6 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -169,18 +170,49 @@ async function fetchWithTimeout(url, init, timeoutMs) {
   }
 }
 
-async function qualifyLocal(item, timeoutMs) {
-  const startedAtMs = Date.now();
+async function qualifyLocal(item, timeoutMs, receiptPath) {
+  const startedAt = new Date();
+  const startedAtMs = startedAt.getTime();
+  const request = localRequest(item);
+  const eventsPath = path.join(receiptPath, "events.jsonl");
+  const stderrPath = path.join(receiptPath, "stderr.log");
+  mkdirSync(receiptPath, { recursive: true });
+  writeFileSync(path.join(receiptPath, "request.json"), `${JSON.stringify({
+    provider: item.provider,
+    model: item.model,
+    role: item.role,
+    timeoutMs,
+    startedAt: startedAt.toISOString(),
+    ...request,
+  }, null, 2)}\n`);
+  writeFileSync(eventsPath, "");
+  writeFileSync(stderrPath, "");
+  let payload = null;
+  let rawResponse = "";
+  let result;
   try {
     const response = await fetchWithTimeout(`${ollamaBaseUrl()}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify(localRequest(item)),
+      body: JSON.stringify(request),
     }, timeoutMs);
-    const payload = await response.json();
+    rawResponse = await response.text();
+    try {
+      payload = JSON.parse(rawResponse);
+    } catch {
+      payload = null;
+    }
+    appendFileSync(eventsPath, `${JSON.stringify({
+      type: "ollama_response",
+      receivedAt: new Date().toISOString(),
+      httpStatus: response.status,
+      payload,
+      rawResponse: payload === null ? rawResponse : undefined,
+    })}\n`);
     if (!response.ok) throw new Error(`Ollama returned HTTP ${response.status}`);
+    if (payload === null) throw new Error("Ollama returned invalid JSON");
     const evaluated = evaluateLocalQualification(item.role, payload);
-    return {
+    result = {
       ...evaluated,
       durationMs: Date.now() - startedAtMs,
       usage: {
@@ -192,8 +224,32 @@ async function qualifyLocal(item, timeoutMs) {
       },
     };
   } catch (error) {
-    return { passed: false, detail: error.message, durationMs: Date.now() - startedAtMs, usage: null };
+    if (!rawResponse) {
+      appendFileSync(eventsPath, `${JSON.stringify({
+        type: "ollama_error",
+        receivedAt: new Date().toISOString(),
+        error: error.message,
+      })}\n`);
+    }
+    result = { passed: false, detail: error.message, durationMs: Date.now() - startedAtMs, usage: null };
   }
+  const terminal = {
+    provider: item.provider,
+    model: item.model,
+    role: item.role,
+    ...result,
+    startedAt: startedAt.toISOString(),
+    finishedAt: new Date().toISOString(),
+  };
+  const finalMessage = typeof payload?.response === "string"
+    ? payload.response
+    : typeof payload?.error === "string"
+      ? payload.error
+      : rawResponse;
+  if (!terminal.passed) writeFileSync(stderrPath, `${terminal.detail}\n`);
+  writeFileSync(path.join(receiptPath, "last-message.txt"), `${finalMessage}\n`);
+  writeFileSync(path.join(receiptPath, "result.json"), `${JSON.stringify(terminal, null, 2)}\n`);
+  return terminal;
 }
 
 function initializeWriteFixture(root) {
@@ -379,12 +435,14 @@ export async function main(argv = process.argv.slice(2)) {
       }
     }
     let result;
-    const receiptPath = item.paid
-      ? path.join(stateRoot, "runs", `${new Date().toISOString().replace(/[:.]/g, "-")}-${invocationId}`)
-      : null;
+    const receiptPath = path.join(
+      stateRoot,
+      "runs",
+      `${new Date().toISOString().replace(/[:.]/g, "-")}-${item.paid ? invocationId : randomUUID()}`,
+    );
     try {
       result = item.provider === "ollama"
-        ? await qualifyLocal(item, config.budgets.qualificationMinutes * 60_000)
+        ? await qualifyLocal(item, config.budgets.qualificationMinutes * 60_000, receiptPath)
         : await qualifyCodex(
           item,
           config.budgets.qualificationMinutes * 60_000,
@@ -424,6 +482,7 @@ export async function main(argv = process.argv.slice(2)) {
       durationMs: result.durationMs,
       usage: result.usage,
       invocationId,
+      receiptPath,
       finishedAt: new Date().toISOString(),
     };
     appendFileSync(qualificationLedgerPath, `${JSON.stringify(record)}\n`);

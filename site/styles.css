@@ -412,6 +412,13 @@ tbody tr:hover { background: rgba(255,255,255,.035); }
 .footer-grid p { margin: 0; font-size: 13px; }
 .footer-links { display: flex; flex-wrap: wrap; gap: 22px; }
 .footer-links a { min-width: 44px; font-size: 13px; text-underline-offset: 4px; }
+.site-header .brand,
+.nav-links > a,
+.footer-links a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
 
 @media (max-width: 960px) {
   .hero, .problem-grid, .controls-layout, .routing-layout, .evidence, .quick-layout, .status-intro { grid-template-columns: 1fr; }

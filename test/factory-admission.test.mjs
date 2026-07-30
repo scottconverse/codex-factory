@@ -63,6 +63,11 @@ test("Windows delete-pending EPERM remains lock contention", (t) => {
   const lockPath = path.join(root, "usage.lock");
   writeFileSync(lockPath, "{}");
   assert.equal(isContendedClaim({ code: "EPERM" }, lockPath, "win32"), true);
+  assert.equal(
+    isContendedClaim({ code: "EPERM" }, path.join(root, "missing.lock"), "win32", { boundedFileLock: true }),
+    true,
+    "a delete-pending Windows lock may be absent from existsSync while open still returns EPERM",
+  );
   assert.equal(isContendedClaim({ code: "EPERM" }, path.join(root, "missing.lock"), "win32"), false);
   assert.equal(isContendedClaim({ code: "EPERM" }, lockPath, "linux"), false);
 });

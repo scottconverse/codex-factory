@@ -12,12 +12,16 @@ of recreating an agent runtime.
 
 ## 2026-07-29 — Close unsafe defaults
 
-Worker execution is explicit, serial, single-attempt, budget-reserved, and
-non-recursive. Unknown paid usage prevents another paid launch.
+**Superseded for concurrency and admission locking on 2026-07-29.** The current
+invariant permits one to four bounded worker slots. Dependency-ready tasks with
+non-overlapping write paths may execute concurrently; each candidate route
+remains single-attempt and non-recursive. Unknown paid usage prevents another
+paid launch.
 
-Reservations and duplicate-task checks occur while holding the worker lock.
-Provider/accounting mismatches are invalid configuration. A terminal CLI result
-is called `process_completed`; acceptance remains a separate coordinator claim.
+Reservations and duplicate-task checks serialize under the dedicated usage
+ledger lock, separately from worker-slot ownership. Provider/accounting
+mismatches are invalid configuration. A terminal CLI result is called
+`process_completed`; acceptance remains a separate coordinator claim.
 
 ## 2026-07-29 — Terminal token accounting is insufficient for paid hard caps
 

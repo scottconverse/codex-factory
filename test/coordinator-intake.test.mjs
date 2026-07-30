@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
-import os from "node:os";
+import { existsSync, linkSync, mkdirSync, readFileSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 import { bootstrapRepository, createCoordinatorIntake } from "../scripts/coordinator-intake.mjs";
+import { createTemporaryRoot } from "./fixtures/temporary-root.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-test("createCoordinatorIntake copies an owner prompt into an existing repository and reserves an internal plan path", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-intake-"));
+test("createCoordinatorIntake copies an owner prompt into an existing repository and reserves an internal plan path", (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-intake-");
   const promptFile = path.join(root, "owner-spec.md");
   const repository = path.join(root, "repository");
   bootstrapRepository(repository);
@@ -34,8 +34,8 @@ test("createCoordinatorIntake copies an owner prompt into an existing repository
   assert.equal(spawnSync("git", ["status", "--short"], { cwd: repository, encoding: "utf8" }).stdout, "");
 });
 
-test("createCoordinatorIntake accepts a direct coordinator prompt without making the owner create a file", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-direct-"));
+test("createCoordinatorIntake accepts a direct coordinator prompt without making the owner create a file", (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-direct-");
   const repository = path.join(root, "repository");
   bootstrapRepository(repository);
   const intake = createCoordinatorIntake({
@@ -48,8 +48,8 @@ test("createCoordinatorIntake accepts a direct coordinator prompt without making
   assert.equal(readFileSync(intake.sourcePath, "utf8"), "Add a documented health-check command to this project.\n");
 });
 
-test("coordinator intake CLI bootstraps a new repository from an owner prompt without requiring a JSON plan", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-cli-"));
+test("coordinator intake CLI bootstraps a new repository from an owner prompt without requiring a JSON plan", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-cli-");
   const repository = path.join(parent, "new-product");
   const result = spawnSync(process.execPath, [
     "scripts/coordinator-intake.mjs",
@@ -66,8 +66,8 @@ test("coordinator intake CLI bootstraps a new repository from an owner prompt wi
   assert.equal(existsSync(intake.planFile), false);
 });
 
-test("createCoordinatorIntake normalizes a repository subdirectory to the Git root used by campaigns", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-subdir-"));
+test("createCoordinatorIntake normalizes a repository subdirectory to the Git root used by campaigns", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-subdir-");
   const repository = path.join(parent, "repository");
   bootstrapRepository(repository);
   const nested = path.join(repository, "packages", "app");
@@ -78,8 +78,8 @@ test("createCoordinatorIntake normalizes a repository subdirectory to the Git ro
   assert.equal(existsSync(intake.sourcePath), true);
 });
 
-test("createCoordinatorIntake rejects bare repositories before writing coordinator state", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-bare-"));
+test("createCoordinatorIntake rejects bare repositories before writing coordinator state", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-bare-");
   const repository = path.join(parent, "repository.git");
   assert.equal(spawnSync("git", ["init", "--bare", repository], { encoding: "utf8" }).status, 0);
 
@@ -87,8 +87,8 @@ test("createCoordinatorIntake rejects bare repositories before writing coordinat
   assert.equal(existsSync(path.join(repository, ".codex-factory")), false);
 });
 
-test("createCoordinatorIntake preserves tracked owner work by refusing a dirty worktree", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-dirty-"));
+test("createCoordinatorIntake preserves tracked owner work by refusing a dirty worktree", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-dirty-");
   const repository = path.join(parent, "repository");
   bootstrapRepository(repository);
   writeFileSync(path.join(repository, "owner.txt"), "first\n");
@@ -100,8 +100,8 @@ test("createCoordinatorIntake preserves tracked owner work by refusing a dirty w
   assert.equal(existsSync(path.join(repository, ".codex-factory")), false);
 });
 
-test("createCoordinatorIntake does not touch a redirected coordinator directory in the target repository", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-link-"));
+test("createCoordinatorIntake does not touch a redirected coordinator directory in the target repository", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-link-");
   const repository = path.join(parent, "repository");
   const outside = path.join(parent, "outside");
   bootstrapRepository(repository);
@@ -113,8 +113,8 @@ test("createCoordinatorIntake does not touch a redirected coordinator directory 
   assert.equal(existsSync(path.join(outside, "coordinator")), false);
 });
 
-test("createCoordinatorIntake does not mutate a hard-linked Git exclude file in the target repository", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-exclude-link-"));
+test("createCoordinatorIntake does not mutate a hard-linked Git exclude file in the target repository", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-exclude-link-");
   const repository = path.join(parent, "repository");
   const outside = path.join(parent, "outside-exclude");
   assert.equal(spawnSync("git", ["init", repository], { encoding: "utf8" }).status, 0);
@@ -131,8 +131,8 @@ test("createCoordinatorIntake does not mutate a hard-linked Git exclude file in 
   assert.equal(readFileSync(outside, "utf8"), "outside\n");
 });
 
-test("bootstrapRepository never adopts an existing Git repository even if it carries a forged Factory marker", () => {
-  const repository = mkdtempSync(path.join(os.tmpdir(), "codex-factory-forged-"));
+test("bootstrapRepository never adopts an existing Git repository even if it carries a forged Factory marker", (t) => {
+  const repository = createTemporaryRoot(t, "codex-factory-forged-");
   assert.equal(spawnSync("git", ["init"], { cwd: repository, encoding: "utf8" }).status, 0);
   writeFileSync(path.join(repository, "owner.txt"), "owner history\n");
   assert.equal(spawnSync("git", ["add", "owner.txt"], { cwd: repository, encoding: "utf8" }).status, 0);
@@ -149,8 +149,8 @@ test("bootstrapRepository never adopts an existing Git repository even if it car
   assert.equal(spawnSync("git", ["log", "-1", "--pretty=%s"], { cwd: repository, encoding: "utf8" }).stdout.trim(), "owner history");
 });
 
-test("bootstrapRepository initializes only an empty target and gives the coordinator a usable Git base", () => {
-  const parent = mkdtempSync(path.join(os.tmpdir(), "codex-factory-bootstrap-"));
+test("bootstrapRepository initializes only an empty target and gives the coordinator a usable Git base", (t) => {
+  const parent = createTemporaryRoot(t, "codex-factory-bootstrap-");
   const repository = path.join(parent, "new-product");
   const bootstrapped = bootstrapRepository(repository);
 
@@ -160,8 +160,8 @@ test("bootstrapRepository initializes only an empty target and gives the coordin
   assert.throws(() => bootstrapRepository(repository), /already a Git repository/i);
 });
 
-test("bootstrapRepository refuses a nonempty non-Git directory instead of adopting owner files", () => {
-  const repository = mkdtempSync(path.join(os.tmpdir(), "codex-factory-owner-files-"));
+test("bootstrapRepository refuses a nonempty non-Git directory instead of adopting owner files", (t) => {
+  const repository = createTemporaryRoot(t, "codex-factory-owner-files-");
   writeFileSync(path.join(repository, "important.txt"), "owner data\n");
 
   assert.throws(() => bootstrapRepository(repository), /must not already exist/i);
@@ -169,16 +169,16 @@ test("bootstrapRepository refuses a nonempty non-Git directory instead of adopti
   assert.equal(existsSync(path.join(repository, ".git")), false);
 });
 
-test("bootstrapRepository preserves an existing empty directory instead of replacing it", () => {
-  const repository = mkdtempSync(path.join(os.tmpdir(), "codex-factory-empty-owner-dir-"));
+test("bootstrapRepository preserves an existing empty directory instead of replacing it", (t) => {
+  const repository = createTemporaryRoot(t, "codex-factory-empty-owner-dir-");
 
   assert.throws(() => bootstrapRepository(repository), /must not already exist/i);
   assert.equal(existsSync(repository), true);
   assert.equal(existsSync(path.join(repository, ".git")), false);
 });
 
-test("createCoordinatorIntake rejects prompt content that is missing or non-actionable", () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-empty-"));
+test("createCoordinatorIntake rejects prompt content that is missing or non-actionable", (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-empty-");
   const repository = path.join(root, "repository");
   bootstrapRepository(repository);
   assert.throws(() => createCoordinatorIntake({

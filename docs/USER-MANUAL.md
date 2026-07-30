@@ -171,6 +171,9 @@ reasoning benchmark; a protocol-only write response is insufficient. Current
 admission comes from the latest record for the exact fingerprint and role in
 the private qualification ledger. Historical results in tracked experiment
 documents do not override a newer exact-fingerprint record.
+Every executed qualification also retains a per-run bundle under
+`.codex-factory/runs/` with its request, response events, diagnostics, final
+message, timing, usage, and terminal result.
 
 | Role policy | Required qualification | Minimum tier | Sandbox |
 |---|---|---|---|
@@ -340,7 +343,7 @@ The initial configuration permits:
   previewed local, Luna, and Terra ladder);
 - 30 minutes per worker.
 
-Reservations are written under the worker lock before launch and reconciled
+Reservations are written under the dedicated usage ledger lock before launch and reconciled
 when terminal usage arrives. If a worker crashes before reporting usage, its
 reservation remains charged.
 

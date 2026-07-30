@@ -2,8 +2,8 @@ import http from "node:http";
 
 const MODEL = "qwen3.5:14b";
 
-function send(response, payload) {
-  response.writeHead(200, { "content-type": "application/json" });
+function send(response, payload, status = 200) {
+  response.writeHead(status, { "content-type": "application/json" });
   response.end(JSON.stringify(payload));
 }
 
@@ -18,6 +18,9 @@ const server = http.createServer((request, response) => {
     }
     if (request.url === "/api/show") return send(response, { capabilities: ["completion"] });
     if (request.url === "/api/generate") {
+      if (process.env.CODEX_FACTORY_FAKE_OLLAMA_FAILURE === "generate") {
+        return send(response, { error: "fixture generation failure" }, 503);
+      }
       let artifact;
       if (body.prompt?.includes("two legs")) {
         artifact = JSON.stringify({ valid: false, reason: "60 mm exceeds 40 mm", holeCount: 4 });

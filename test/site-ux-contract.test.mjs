@@ -38,6 +38,11 @@ test("mobile navigation starts above 840px and visible links have 44px hit targe
     assert.match(css, new RegExp(`${escaped}[^}]*min-height:\\s*44px`, "i"), `${selector} needs a 44px mobile hit height`);
   }
   assert.match(css, /\.footer-links a\s*\{[^}]*min-width:\s*44px/i);
+  const desktopCss = css.split("@media")[0];
+  for (const selector of [".site-header .brand", ".nav-links > a", ".footer-links a"]) {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(desktopCss, new RegExp(`${escaped}[^}]*min-height:\\s*44px`, "i"), `${selector} needs a 44px desktop hit height`);
+  }
 });
 
 test("desktop roster metrics keep headings at whole-word boundaries", () => {

@@ -53,9 +53,14 @@ function reclaimDeadClaim(pathname) {
   return true;
 }
 
-export function isContendedClaim(error, pathname, platform = process.platform) {
+export function isContendedClaim(
+  error,
+  pathname,
+  platform = process.platform,
+  { boundedFileLock = false } = {},
+) {
   return error.code === "EEXIST"
-    || (platform === "win32" && error.code === "EPERM" && existsSync(pathname));
+    || (platform === "win32" && error.code === "EPERM" && (boundedFileLock || existsSync(pathname)));
 }
 
 export function acquireWorkerSlot(stateRoot, maximum, metadata = {}) {
@@ -85,7 +90,7 @@ export async function acquireFileLock(pathname, metadata = {}, { timeoutMs = 5_0
     try {
       return claim(resolved, metadata);
     } catch (error) {
-      if (!isContendedClaim(error, resolved)) throw error;
+      if (!isContendedClaim(error, resolved, process.platform, { boundedFileLock: true })) throw error;
       if (reclaimDeadClaim(resolved)) continue;
       if (Date.now() >= deadline) throw new Error(`Timed out waiting for lock ${resolved}`);
       await new Promise((resolve) => setTimeout(resolve, retryMs));

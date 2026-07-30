@@ -14,7 +14,7 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { prepareDeclaredWritePath } from "./factory-process.mjs";
+import { prepareDeclaredWritePath, superviseProcess } from "./factory-process.mjs";
 import {
   buildAttemptLadder,
   remainingAttemptMs,
@@ -195,22 +195,79 @@ Do not delegate
 `;
 }
 
-function runCheck(task, cwd, timeoutMs = 30 * 60_000) {
-  const result = spawnSync(task.check.command, task.check.args, {
-    cwd,
-    encoding: "utf8",
-    windowsHide: true,
-    timeout: timeoutMs,
-  });
-  if (result.error) throw result.error;
-  if (result.status !== 0) throw new Error(`Required check failed (${result.status}): ${result.stderr || result.stdout}`.trim());
-  return {
+export async function runRequiredCheck(task, cwd, timeoutMs = 30 * 60_000, receiptPath = null) {
+  const startedAt = new Date();
+  const stdout = [];
+  const stderr = [];
+  let processResult;
+  try {
+    processResult = await superviseProcess({
+      command: task.check.command,
+      args: task.check.args,
+      cwd,
+      prompt: "",
+      timeoutMs,
+      onStdout: (chunk) => stdout.push(chunk),
+      onStderr: (chunk) => stderr.push(chunk),
+    });
+  } catch (error) {
+    const receipt = {
+      command: task.check.command,
+      args: task.check.args,
+      exitCode: null,
+      timedOut: false,
+      interrupted: null,
+      pid: error.childPid ?? null,
+      stdout: Buffer.concat(stdout).toString("utf8"),
+      stderr: Buffer.concat(stderr).toString("utf8"),
+      error: error.message,
+      errorCode: error.code ?? null,
+      cleanupDisposition: error.code === "PROCESS_NOT_REAPED" ? "unreaped" : "failed",
+      startedAt: startedAt.toISOString(),
+      finishedAt: new Date().toISOString(),
+    };
+    if (receiptPath) {
+      mkdirSync(path.dirname(receiptPath), { recursive: true });
+      writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+    }
+    throw error;
+  }
+  const receipt = {
     command: task.check.command,
     args: task.check.args,
-    exitCode: result.status,
-    stdout: result.stdout,
-    stderr: result.stderr,
+    exitCode: processResult.exitCode,
+    timedOut: processResult.timedOut,
+    interrupted: processResult.interrupted,
+    pid: processResult.pid,
+    stdout: Buffer.concat(stdout).toString("utf8"),
+    stderr: Buffer.concat(stderr).toString("utf8"),
+    cleanupDisposition: "reaped",
+    startedAt: startedAt.toISOString(),
+    finishedAt: new Date().toISOString(),
   };
+  if (receiptPath) {
+    mkdirSync(path.dirname(receiptPath), { recursive: true });
+    writeFileSync(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`);
+  }
+  if (receipt.timedOut) {
+    const error = new Error(`Required check timed out after ${timeoutMs}ms`);
+    error.code = "WORKER_ATTEMPT_FAILED";
+    error.checkReceipt = receipt;
+    throw error;
+  }
+  if (receipt.interrupted) {
+    const error = new Error(`Required check interrupted by ${receipt.interrupted}`);
+    error.code = "CAMPAIGN_INTERRUPTED";
+    error.checkReceipt = receipt;
+    throw error;
+  }
+  if (receipt.exitCode !== 0) {
+    const error = new Error(`Required check failed (${receipt.exitCode}): ${receipt.stderr || receipt.stdout}`.trim());
+    error.code = "WORKER_ATTEMPT_FAILED";
+    error.checkReceipt = receipt;
+    throw error;
+  }
+  return receipt;
 }
 
 function cleanupWorktree(repository, result) {
@@ -331,7 +388,12 @@ async function executeCodexAttempt({
     assertSafeWritePaths(worktreePath, task.writePaths);
     let uniqueChanged = validateChangedPaths(worktreePath, base, task.writePaths);
     if (!uniqueChanged.length) throw new Error("Worker produced no repository changes");
-    const check = runCheck(task, worktreePath, deadlineMs ? remainingAttemptMs(deadlineMs) : undefined);
+    const check = await runRequiredCheck(
+      task,
+      worktreePath,
+      deadlineMs ? remainingAttemptMs(deadlineMs) : undefined,
+      path.join(runPath, "tasks", `${taskId}.check.json`),
+    );
     uniqueChanged = validateChangedPaths(worktreePath, base, task.writePaths);
     if (!uniqueChanged.length) throw new Error("Required check removed all worker changes");
     git(["reset"], worktreePath);

@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import os from "node:os";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { createCoordinatorIntake } from "../scripts/coordinator-intake.mjs";
 import * as campaignRunner from "../scripts/run-campaign.mjs";
+import { createTemporaryRoot } from "./fixtures/temporary-root.mjs";
 
 function git(repository, args) {
   const result = spawnSync("git", args, { cwd: repository, encoding: "utf8", windowsHide: true });
@@ -65,9 +65,13 @@ function injectedAttempts() {
   }];
 }
 
+test("campaign main exposes its dry-run contract through help", async () => {
+  assert.equal(await campaignRunner.main(["--help"]), null);
+});
+
 test("owner prompt reaches a real campaign integration commit while the owner branch stays unchanged", async (t) => {
   assert.equal(typeof campaignRunner.runCampaign, "function", "run-campaign must expose an injectable real orchestration seam");
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-e2e-"));
+  const root = createTemporaryRoot(t, "codex-factory-campaign-e2e-");
   const repository = createOwnerRepository(root);
   const stateRoot = path.join(root, "factory-state");
   const ownerHead = git(repository, ["rev-parse", "HEAD"]);
@@ -90,11 +94,6 @@ test("owner prompt reaches a real campaign integration commit while the owner br
       return { status: "process_completed", exitCode: 0, finalMessage: "fixture completed" };
     },
   });
-  t.after(() => {
-    git(repository, ["worktree", "remove", "--force", result.integrationPath]);
-    git(repository, ["branch", "-D", result.integrationBranch]);
-  });
-
   assert.equal(result.status, "completed");
   assert.notEqual(result.commit, ownerHead);
   assert.equal(readFileSync(path.join(result.integrationPath, "src", "result.txt"), "utf8").replaceAll("\r\n", "\n"), "built by worker\n");
@@ -111,9 +110,9 @@ test("owner prompt reaches a real campaign integration commit while the owner br
   assert.equal(git(repository, ["status", "--short"]), "");
 });
 
-test("a failed real campaign removes worker and integration worktrees and records cleanup receipts", async () => {
+test("a failed real campaign removes worker and integration worktrees and records cleanup receipts", async (t) => {
   assert.equal(typeof campaignRunner.runCampaign, "function", "run-campaign must expose an injectable real orchestration seam");
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-fail-"));
+  const root = createTemporaryRoot(t, "codex-factory-campaign-fail-");
   const repository = createOwnerRepository(root);
   const stateRoot = path.join(root, "factory-state");
   const ownerHead = git(repository, ["rev-parse", "HEAD"]);
@@ -152,8 +151,8 @@ test("a failed real campaign removes worker and integration worktrees and record
   assert.equal(git(repository, ["status", "--short"]), "");
 });
 
-test("campaign preview fails closed when a task has no qualified attempts", async () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-preview-"));
+test("campaign preview fails closed when a task has no qualified attempts", async (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-campaign-preview-");
   const repository = createOwnerRepository(root);
   const intake = createCoordinatorIntake({
     repository,
@@ -174,8 +173,8 @@ test("campaign preview fails closed when a task has no qualified attempts", asyn
   });
 });
 
-test("campaign refuses repository commits made after coordinator intake", async () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-drift-"));
+test("campaign refuses repository commits made after coordinator intake", async (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-campaign-drift-");
   const repository = createOwnerRepository(root);
   const intake = createCoordinatorIntake({
     repository,
@@ -193,8 +192,8 @@ test("campaign refuses repository commits made after coordinator intake", async 
   }), /changed since coordinator intake|does not match.*base/i);
 });
 
-test("campaign refuses tracked owner edits made after coordinator intake", async () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-dirty-"));
+test("campaign refuses tracked owner edits made after coordinator intake", async (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-campaign-dirty-");
   const repository = createOwnerRepository(root);
   const intake = createCoordinatorIntake({
     repository,
@@ -210,8 +209,8 @@ test("campaign refuses tracked owner edits made after coordinator intake", async
   }), /tracked owner changes/i);
 });
 
-test("campaign waits for parallel siblings before writing failure and cleaning every worktree", async () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-sibling-"));
+test("campaign waits for parallel siblings before writing failure and cleaning every worktree", async (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-campaign-sibling-");
   const repository = createOwnerRepository(root);
   const stateRoot = path.join(root, "factory-state");
   const intake = createCoordinatorIntake({
@@ -277,8 +276,8 @@ test("campaign waits for parallel siblings before writing failure and cleaning e
   assert.match(cleanup, /slow-sibling/);
 });
 
-test("campaign does not launch a fallback after a worker containment failure", async () => {
-  const root = mkdtempSync(path.join(os.tmpdir(), "codex-factory-campaign-containment-"));
+test("campaign does not launch a fallback after a worker containment failure", async (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-campaign-containment-");
   const repository = createOwnerRepository(root);
   const intake = createCoordinatorIntake({
     repository,
@@ -306,4 +305,25 @@ test("campaign does not launch a fallback after a worker containment failure", a
   }), (error) => error.code === "PROCESS_NOT_REAPED");
 
   assert.deepEqual(seen, ["local"]);
+});
+
+test("campaign required-check supervision reaps a timed-out parent and grandchild before rejecting", async (t) => {
+  const root = createTemporaryRoot(t, "codex-factory-campaign-check-tree-");
+  const pidsPath = path.join(root, "pids.jsonl");
+  const receiptPath = path.join(root, "check.json");
+  await assert.rejects(() => campaignRunner.runRequiredCheck({
+    check: {
+      command: process.execPath,
+      args: [path.join(import.meta.dirname, "fixtures", "process-tree-parent.mjs"), pidsPath],
+    },
+  }, root, 500, receiptPath), /timed out/i);
+  const pids = readFileSync(pidsPath, "utf8").trim().split(/\r?\n/).map((line) => JSON.parse(line));
+  assert.deepEqual(pids.map(({ role }) => role).sort(), ["grandchild", "parent"]);
+  for (const { pid } of pids) {
+    assert.throws(() => process.kill(pid, 0), { code: "ESRCH" }, `pid ${pid} must be dead`);
+  }
+  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  assert.equal(receipt.timedOut, true);
+  assert.equal(receipt.cleanupDisposition, "reaped");
+  assert.equal(Number.isSafeInteger(receipt.pid), true);
 });

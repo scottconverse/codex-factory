@@ -95,10 +95,11 @@ function qualify(root, markerPath, role = "workspace_write") {
   ], { cwd: root, env: fakeEnvironment(root, markerPath) });
 }
 
-function startFakeOllama() {
+function startFakeOllama(extraEnv = {}) {
   const child = spawn(process.execPath, [FAKE_OLLAMA], {
     stdio: ["ignore", "ignore", "inherit", "ipc"],
     windowsHide: true,
+    env: { ...process.env, ...extraEnv },
   });
   return new Promise((resolve, reject) => {
     child.once("error", reject);
@@ -107,6 +108,31 @@ function startFakeOllama() {
       baseUrl: `http://127.0.0.1:${port}`,
     }));
   });
+}
+
+function assertLocalQualificationReceipt(qualification, { passed, status }) {
+  assert.equal(typeof qualification.receiptPath, "string");
+  assert.ok(qualification.receiptPath.length > 0);
+  const request = JSON.parse(readFileSync(path.join(qualification.receiptPath, "request.json"), "utf8"));
+  assert.equal(request.provider, "ollama");
+  assert.equal(request.model, qualification.model);
+  assert.equal(request.role, qualification.role);
+  assert.equal(typeof request.startedAt, "string");
+  assert.equal(typeof request.prompt, "string");
+  const events = records(path.join(qualification.receiptPath, "events.jsonl"));
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "ollama_response");
+  assert.equal(events[0].httpStatus, status);
+  assert.equal(typeof events[0].receivedAt, "string");
+  const result = JSON.parse(readFileSync(path.join(qualification.receiptPath, "result.json"), "utf8"));
+  assert.equal(result.provider, "ollama");
+  assert.equal(result.model, qualification.model);
+  assert.equal(result.role, qualification.role);
+  assert.equal(result.passed, passed);
+  assert.equal(typeof result.startedAt, "string");
+  assert.equal(typeof result.finishedAt, "string");
+  assert.equal(existsSync(path.join(qualification.receiptPath, "stderr.log")), true);
+  assert.equal(existsSync(path.join(qualification.receiptPath, "last-message.txt")), true);
 }
 
 function stopFakeOllama(child) {
@@ -246,6 +272,8 @@ test("local patch crosses fake Ollama and records an accepted bounded commit", a
       "--execute",
     ], { cwd: root, env });
     assert.equal(qualification.status, 0, qualification.stderr || qualification.stdout);
+    const record = records(path.join(root, ".codex-factory", "qualifications.jsonl")).at(-1);
+    assertLocalQualificationReceipt(record, { passed: true, status: 200 });
   }
 
   const repository = path.join(root, "local-owner");
@@ -304,6 +332,32 @@ test("local patch crosses fake Ollama and records an accepted bounded commit", a
   assert.equal(existsSync(slotsPath) ? readdirSync(slotsPath).length : 0, 0);
   git(repository, ["worktree", "remove", "--force", result.worktreePath]);
   git(repository, ["branch", "-D", result.branch]);
+});
+
+test("failed local qualification retains the Ollama request, response, diagnostics, and result", async (t) => {
+  const root = isolatedFactory();
+  const ollama = await startFakeOllama({ CODEX_FACTORY_FAKE_OLLAMA_FAILURE: "generate" });
+  t.after(async () => {
+    await stopFakeOllama(ollama.child);
+    rmSync(root, { recursive: true, force: true });
+  });
+  const qualification = run(process.execPath, [
+    path.join(root, "scripts", "qualify-fleet.mjs"),
+    "--provider", "ollama",
+    "--model", "qwen3.5:14b",
+    "--role", "benchmark",
+    "--execute",
+  ], {
+    cwd: root,
+    env: { ...process.env, CODEX_FACTORY_TEST_OLLAMA_URL: ollama.baseUrl },
+  });
+  assert.notEqual(qualification.status, 0);
+  const record = records(path.join(root, ".codex-factory", "qualifications.jsonl")).at(-1);
+  assert.equal(record.passed, false);
+  assert.match(record.detail, /HTTP 503/);
+  assertLocalQualificationReceipt(record, { passed: false, status: 503 });
+  assert.match(readFileSync(path.join(record.receiptPath, "stderr.log"), "utf8"), /HTTP 503/);
+  assert.match(readFileSync(path.join(record.receiptPath, "last-message.txt"), "utf8"), /fixture generation failure/);
 });
 
 test("real supervisor reaps a child and grandchild on timeout before resolving and removes listeners", async (context) => {
