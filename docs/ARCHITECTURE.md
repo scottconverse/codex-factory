@@ -102,7 +102,10 @@ intentionally outside version control.
 ### Operator skill
 
 `skills/codex-factory/` packages the dry-run, execution, and stop conditions as
-a Codex skill. Version 0.1.1 does not install the skill automatically.
+a Codex skill. The checkout does not install itself. Open the Factory checkout
+as the workspace for the top-level Codex task and explicitly tell the selected
+model to read `skills/codex-factory/SKILL.md` completely and use it to
+coordinate the owner request. That selected model is the coordinator.
 
 ## Trust boundaries
 

@@ -11,6 +11,8 @@ Every worker request must name:
 
 Workers are leaves. They do not delegate, broaden scope, merge, publish, install,
 or make product decisions. The coordinator does not repeat assigned work.
+The coordinator is the selected model in the top-level Codex task; campaign
+Luna and Terra routes remain bounded fallback workers.
 
 The runner writes receipts under `.codex-factory/runs/` and campaigns under
 `.codex-factory/campaigns/`. Worker slots bound concurrent execution; the paid

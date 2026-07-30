@@ -1,16 +1,22 @@
 # Codex-native factory bakeoff
 
+> Historical plan: this records the serial 0.1.0 bakeoff and is not the current
+> operating contract. Current campaigns use one to four configured worker slots
+> (three in the checked-in configuration); only dependency-ready,
+> `parallelSafe`, path-non-overlapping tasks share a batch, and paid admission is
+> serialized under the ledger lock.
+
 ## Budget
 
 - 250,000 aggregate paid-model tokens.
 - Local-model tokens are telemetry; wall time and capacity are the enforced
   limits.
-- One worker at a time.
+- One worker at a time for this historical bakeoff.
 - One attempt per task.
 - Thirty minutes maximum per worker.
 - Stop paid execution when usage is missing or malformed.
 
-Token reservations are persisted under the single-worker lock before launch and
+Token reservations were persisted under the single-worker lock before launch and
 reconciled at the terminal usage event. A crashed reservation remains charged
 and its task ID cannot be reused. The initial Codex CLI surface does not expose
 an in-turn hard token interrupt; a result that exceeds its reservation fails the

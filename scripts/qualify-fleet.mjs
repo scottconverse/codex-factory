@@ -8,7 +8,7 @@ import {
   rmSync,
   writeFileSync,
 } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
@@ -18,32 +18,34 @@ import {
   discoverOllama,
   qualificationPlan,
 } from "./factory-fleet.mjs";
-import { summarizeLedger, summarizeUsage } from "./run-worker.mjs";
+import { reconcilePaidUsage, reservePaidUsage } from "./factory-admission.mjs";
+import { superviseProcess } from "./factory-process.mjs";
+import { acquireWorkerSlot } from "./factory-slots.mjs";
+import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
+import { summarizeUsage } from "./run-worker.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const ANALYSIS_MARKER = "CODEX_FACTORY_ANALYSIS_QUALIFIED";
 const WRITE_PATH = "src/value.mjs";
 const WRITE_CONTENT = "export const value = 42;\n";
+const USAGE = `Usage:
+  node scripts/qualify-fleet.mjs [--provider <provider>] [--model <model>]
+    [--role <role>] [--include-paid] [--execute]
+
+Options:
+  --provider <provider>  Filter qualifications by provider.
+  --model <model>        Filter qualifications by exact model.
+  --role <role>          Filter qualifications by role.
+  --include-paid         DANGEROUS: admit configured paid candidates to the plan.
+  --execute              DANGEROUS: run qualifications; otherwise dry-run.
+  -h, --help             Show this help.`;
 
 export function parseQualificationArgs(argv) {
-  const options = { execute: false, includePaid: false, provider: null, model: null, role: null };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--execute") {
-      options.execute = true;
-      continue;
-    }
-    if (token === "--include-paid") {
-      options.includePaid = true;
-      continue;
-    }
-    if (!["--provider", "--model", "--role"].includes(token)) throw new Error(`Unexpected argument: ${token}`);
-    const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`Missing value for ${token}`);
-    options[token.slice(2)] = value;
-    index += 1;
-  }
-  return options;
+  return parseCliArgs(argv, {
+    valueFlags: { "--provider": "provider", "--model": "model", "--role": "role" },
+    booleanFlags: { "--execute": "execute", "--include-paid": "includePaid" },
+    defaults: { execute: false, includePaid: false, provider: null, model: null, role: null },
+  });
 }
 
 export function filterQualificationPlan(plan, options) {
@@ -202,16 +204,7 @@ function initializeWriteFixture(root) {
   spawnSync("git", ["commit", "-qm", "fixture"], { cwd: root, windowsHide: true });
 }
 
-function terminateProcessTree(child) {
-  if (!child.pid || child.exitCode !== null) return;
-  if (process.platform === "win32") {
-    spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-  } else {
-    try { process.kill(-child.pid, "SIGTERM"); } catch {}
-  }
-}
-
-async function qualifyCodex(item, timeoutMs) {
+async function qualifyCodex(item, timeoutMs, receiptPath) {
   const fixture = mkdtempSync(path.join(os.tmpdir(), "codex-factory-qualification-"));
   const outputPath = path.join(fixture, "last-message.txt");
   if (item.role === "workspace_write") initializeWriteFixture(fixture);
@@ -231,35 +224,40 @@ async function qualifyCodex(item, timeoutMs) {
     "--output-last-message", outputPath,
     "-",
   ];
-  const startedAtMs = Date.now();
-  const child = spawn(process.platform === "win32" ? "codex.exe" : "codex", args, {
-    cwd: fixture,
-    detached: process.platform !== "win32",
-    windowsHide: true,
-    stdio: ["pipe", "pipe", "pipe"],
-  });
+  const startedAt = new Date();
+  const startedAtMs = startedAt.getTime();
   const stdout = [];
   const stderr = [];
-  child.stdout.on("data", (chunk) => stdout.push(chunk));
-  child.stderr.on("data", (chunk) => stderr.push(chunk));
-  child.stdin.on("error", () => {});
-  child.stdin.end(prompt);
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    terminateProcessTree(child);
-  }, timeoutMs);
-  let exitCode = null;
+  mkdirSync(receiptPath, { recursive: true });
+  writeFileSync(path.join(receiptPath, "request.json"), `${JSON.stringify({
+    provider: item.provider, model: item.model, role: item.role,
+    reasoningEffort: item.reasoningEffort, prompt, args,
+  }, null, 2)}\n`);
+  const eventsPath = path.join(receiptPath, "events.jsonl");
+  const stderrPath = path.join(receiptPath, "stderr.log");
+  writeFileSync(eventsPath, "");
+  writeFileSync(stderrPath, "");
+  let processResult = { exitCode: null, timedOut: false, interrupted: null };
   let processError = null;
   try {
-    exitCode = await new Promise((resolve, reject) => {
-      child.once("error", reject);
-      child.once("close", resolve);
+    processResult = await superviseProcess({
+      command: process.platform === "win32" ? "codex.exe" : "codex",
+      args,
+      cwd: fixture,
+      prompt,
+      timeoutMs,
+      onStdout: (chunk) => {
+        stdout.push(chunk);
+        appendFileSync(eventsPath, chunk);
+      },
+      onStderr: (chunk) => {
+        stderr.push(chunk);
+        appendFileSync(stderrPath, chunk);
+      },
     });
   } catch (error) {
     processError = error.message;
-  } finally {
-    clearTimeout(timer);
+    if (error.code === "PROCESS_NOT_REAPED") throw error;
   }
   const events = Buffer.concat(stdout).toString("utf8");
   const usage = summarizeUsage(events);
@@ -267,15 +265,23 @@ async function qualifyCodex(item, timeoutMs) {
   const artifactPassed = item.role === "workspace_write"
     ? existsSync(path.join(fixture, WRITE_PATH)) && readFileSync(path.join(fixture, WRITE_PATH), "utf8") === WRITE_CONTENT
     : evaluateLocalQualification(item.role, { response: finalMessage }).passed;
-  const passed = exitCode === 0 && !timedOut && !processError && artifactPassed && usage !== null;
+  const passed = processResult.exitCode === 0 && !processResult.timedOut && !processResult.interrupted
+    && !processError && artifactPassed && usage !== null;
   const result = {
     passed,
     detail: passed
       ? `exact ${item.role.replace("_", "-")} artifact returned`
-      : processError ?? (timedOut ? "qualification timed out" : Buffer.concat(stderr).toString("utf8").trim() || "qualification artifact was incorrect"),
+      : processError ?? (processResult.timedOut ? "qualification timed out" : Buffer.concat(stderr).toString("utf8").trim() || "qualification artifact was incorrect"),
     durationMs: Date.now() - startedAtMs,
     usage,
+    exitCode: processResult.exitCode,
+    timedOut: processResult.timedOut,
+    interrupted: processResult.interrupted,
+    startedAt: startedAt.toISOString(),
+    finishedAt: new Date().toISOString(),
   };
+  writeFileSync(path.join(receiptPath, "last-message.txt"), `${finalMessage}\n`);
+  writeFileSync(path.join(receiptPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
   rmSync(fixture, { recursive: true, force: true });
   return result;
 }
@@ -285,12 +291,12 @@ function readJsonLines(filename) {
   return readFileSync(filename, "utf8").split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
 }
 
-function paidSpent(usageLedgerPath) {
-  return existsSync(usageLedgerPath) ? summarizeLedger(readFileSync(usageLedgerPath, "utf8"), true) : 0;
-}
-
 export async function main(argv = process.argv.slice(2)) {
   const options = parseQualificationArgs(argv);
+  if (options.help) {
+    printHelp(USAGE);
+    return null;
+  }
   const config = JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8"));
   const ollama = await discoverOllama();
   const candidates = discoverCandidatePool({ config, ollama });
@@ -315,26 +321,62 @@ export async function main(argv = process.argv.slice(2)) {
   const stateRoot = path.join(ROOT, ".codex-factory");
   mkdirSync(stateRoot, { recursive: true });
   const qualificationLedgerPath = path.join(stateRoot, "qualifications.jsonl");
-  const usageLedgerPath = path.join(stateRoot, "usage.jsonl");
   const results = [];
   for (const item of plan) {
     let reservation = null;
+    let slot = null;
+    let invocationId = null;
+    let preserveSlot = false;
+    const taskId = `qualify-${item.model}-${item.role}`;
     if (item.paid) {
       reservation = item.tokenReservation;
       if (!Number.isSafeInteger(reservation) || reservation <= 0) throw new Error(`Paid candidate ${item.model} needs a token reservation`);
-      const remaining = config.budgets.aggregatePaidTokens - paidSpent(usageLedgerPath);
-      if (reservation > remaining) throw new Error(`Qualification for ${item.model} requires ${reservation} tokens; ${remaining} remain`);
-      appendFileSync(usageLedgerPath, `${JSON.stringify({
-        stage: "reserved",
-        taskId: `qualify-${item.model}-${item.role}`,
-        paid: true,
-        reservedTokens: reservation,
-        startedAt: new Date().toISOString(),
-      })}\n`);
+      slot = acquireWorkerSlot(stateRoot, config.budgets.maxConcurrentWorkers, {
+        taskId, provider: item.provider, model: item.model,
+      });
+      try {
+        const admission = await reservePaidUsage({
+          stateRoot,
+          aggregateLimit: config.budgets.aggregatePaidTokens,
+          reservedTokens: reservation,
+          taskId,
+          metadata: { provider: item.provider, model: item.model, role: item.role },
+        });
+        invocationId = admission.invocationId;
+      } catch (error) {
+        slot.release();
+        throw error;
+      }
     }
-    const result = item.provider === "ollama"
-      ? await qualifyLocal(item, config.budgets.qualificationMinutes * 60_000)
-      : await qualifyCodex(item, config.budgets.qualificationMinutes * 60_000);
+    let result;
+    const receiptPath = item.paid
+      ? path.join(stateRoot, "runs", `${new Date().toISOString().replace(/[:.]/g, "-")}-${invocationId}`)
+      : null;
+    try {
+      result = item.provider === "ollama"
+        ? await qualifyLocal(item, config.budgets.qualificationMinutes * 60_000)
+        : await qualifyCodex(
+          item,
+          config.budgets.qualificationMinutes * 60_000,
+          receiptPath,
+        );
+    } catch (error) {
+      if (error.code === "PROCESS_NOT_REAPED" && slot) {
+        preserveSlot = true;
+        slot.quarantine({ taskId, invocationId, reason: "qualification-not-reaped" });
+      }
+      result = { passed: false, detail: error.message, durationMs: 0, usage: null };
+      if (receiptPath) {
+        mkdirSync(receiptPath, { recursive: true });
+        writeFileSync(path.join(receiptPath, "result.json"), `${JSON.stringify({
+          ...result,
+          invocationId,
+          taskId,
+          startedAt: new Date().toISOString(),
+          finishedAt: new Date().toISOString(),
+        }, null, 2)}\n`);
+      }
+    }
     if (item.paid && result.usage?.total_tokens > reservation) {
       result.passed = false;
       result.detail = `qualification used ${result.usage.total_tokens} tokens against ${reservation} reserved`;
@@ -350,17 +392,19 @@ export async function main(argv = process.argv.slice(2)) {
       detail: result.detail,
       durationMs: result.durationMs,
       usage: result.usage,
+      invocationId,
       finishedAt: new Date().toISOString(),
     };
     appendFileSync(qualificationLedgerPath, `${JSON.stringify(record)}\n`);
     if (item.paid) {
-      appendFileSync(usageLedgerPath, `${JSON.stringify({
-        stage: "terminal",
-        taskId: `qualify-${item.model}-${item.role}`,
-        paid: true,
-        usage: result.usage,
-        finishedAt: record.finishedAt,
-      })}\n`);
+      try {
+        await reconcilePaidUsage({
+          stateRoot, invocationId, taskId, usage: result.usage,
+          metadata: { provider: item.provider, model: item.model, role: item.role, status: result.passed ? "process_completed" : "failed" },
+        });
+      } finally {
+        if (!preserveSlot) slot.release();
+      }
     }
     results.push(record);
   }
@@ -377,8 +421,5 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  });
+  main().catch(reportCliError);
 }

@@ -14,10 +14,18 @@ import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
 import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
 import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const USAGE = `Usage:
+  node scripts/run-local-patch.mjs --task-file <file> [--execute]
+
+Options:
+  --task-file <file>  Required bounded local-patch task JSON.
+  --execute           DANGEROUS: apply and check model-generated writes; otherwise dry-run.
+  -h, --help          Show this help.`;
 const OLLAMA_GENERATE_URL = "http://127.0.0.1:11434/api/generate";
 const TASK_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const PLAIN_EXECUTABLE_PATTERN = /^(?:[A-Za-z]:\\[^&|<>\r\n]+|\/[^&|<>\r\n]+|[A-Za-z0-9._-]+)$/;
@@ -305,19 +313,12 @@ async function runCheck(check, cwd, timeoutMs) {
 }
 
 function parseArgs(argv) {
-  const options = { execute: false };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--execute") {
-      options.execute = true;
-      continue;
-    }
-    if (token !== "--task-file") throw new Error(`Unexpected argument: ${token}`);
-    const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error("Missing value for --task-file");
-    options.taskFile = value;
-    index += 1;
-  }
+  const options = parseCliArgs(argv, {
+    valueFlags: { "--task-file": "taskFile" },
+    booleanFlags: { "--execute": "execute" },
+    defaults: { execute: false },
+  });
+  if (options.help) return options;
   if (!options.taskFile) throw new Error("Missing --task-file");
   return options;
 }
@@ -330,6 +331,10 @@ function taskWasAttempted(ledgerPath, taskId) {
 
 export async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
+  if (options.help) {
+    printHelp(USAGE);
+    return null;
+  }
   const taskFile = path.resolve(options.taskFile);
   const task = validateLocalTask(JSON.parse(readFileSync(taskFile, "utf8")));
   const config = JSON.parse(readFileSync(path.join(ROOT, "factory.config.json"), "utf8"));
@@ -500,8 +505,5 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  });
+  main().catch(reportCliError);
 }

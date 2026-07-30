@@ -6,12 +6,15 @@
   "type": "module",
   "description": "Budgeted boss-and-worker orchestration for Codex and qualified local models.",
   "scripts": {
-    "test": "node --test",
-    "check": "node --check scripts/factory-fleet.mjs && node --check scripts/qualify-fleet.mjs && node --check scripts/run-worker.mjs && node --check scripts/run-local-patch.mjs && node --check scripts/factory-campaign.mjs && node --check scripts/coordinator-intake.mjs && node --check scripts/factory-slots.mjs && node --check scripts/run-campaign.mjs && node --check scripts/fleet-smoke.mjs && node --check scripts/build-site.mjs && node --check scripts/check-site.mjs && node --check scripts/check-release.mjs && node --check scripts/serve-site.mjs && node --test",
+    "test": "node --test \"test/*.test.mjs\"",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-lines=50 --test-coverage-branches=60 --test-coverage-functions=70 \"test/*.test.mjs\"",
+    "test:mutation": "node scripts/mutation-check.mjs",
+    "check": "node --check scripts/factory-admission.mjs && node --check scripts/factory-cli.mjs && node --check scripts/factory-process.mjs && node --check scripts/factory-fleet.mjs && node --check scripts/qualify-fleet.mjs && node --check scripts/run-worker.mjs && node --check scripts/run-local-patch.mjs && node --check scripts/factory-campaign.mjs && node --check scripts/coordinator-intake.mjs && node --check scripts/factory-slots.mjs && node --check scripts/run-campaign.mjs && node --check scripts/fleet-smoke.mjs && node --check scripts/build-site.mjs && node --check scripts/check-site.mjs && node --check scripts/check-release.mjs && node --check scripts/serve-site.mjs && node --check scripts/mutation-check.mjs && node --test \"test/*.test.mjs\"",
     "local:patch": "node scripts/run-local-patch.mjs",
     "fleet:qualify": "node scripts/qualify-fleet.mjs",
     "fleet:smoke": "node scripts/fleet-smoke.mjs",
-    "release:check": "node scripts/check-release.mjs",
+    "release:check": "node scripts/check-release.mjs --release",
+    "release:check:development": "node scripts/check-release.mjs --development",
     "site:build": "node scripts/build-site.mjs",
     "site:check": "node scripts/check-site.mjs",
     "site:serve": "node scripts/serve-site.mjs"

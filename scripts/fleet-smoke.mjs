@@ -1,21 +1,32 @@
 #!/usr/bin/env node
 import {
   appendFileSync,
-  closeSync,
   existsSync,
   mkdirSync,
-  openSync,
   readFileSync,
-  rmSync,
   writeFileSync,
 } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { reconcilePaidUsage, reservePaidUsage } from "./factory-admission.mjs";
+import { superviseProcess } from "./factory-process.mjs";
+import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
 import { summarizeUsage } from "./run-worker.mjs";
+import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const USAGE = `Usage:
+  node scripts/fleet-smoke.mjs [--provider <ollama|openai>] [--model <model>]
+    [--reasoning-effort <low|medium|high>] [--timeout-minutes <minutes>] [--execute]
+
+Options:
+  --provider <provider>          Select ollama (default) or openai.
+  --model <model>                Select the exact model; required for openai.
+  --reasoning-effort <effort>   Select low (default), medium, or high.
+  --timeout-minutes <minutes>   Bound each worker to 1-30 minutes.
+  --execute                     DANGEROUS: launch two workers; otherwise dry-run.
+  -h, --help                    Show this help.`;
 const PACKAGE_SOURCE = readFileSync(path.join(ROOT, "package.json"), "utf8");
 const PACKAGE = JSON.parse(PACKAGE_SOURCE);
 const CONFIG_SOURCE = readFileSync(path.join(ROOT, "factory.config.json"), "utf8");
@@ -95,22 +106,18 @@ export function buildSmokeInvocation({ provider, model, reasoningEffort, outputP
 }
 
 function parseArgs(argv) {
-  const options = { execute: false, provider: "ollama", model: null, reasoningEffort: "low", timeoutMinutes: 3 };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--execute") {
-      options.execute = true;
-      continue;
-    }
-    if (!["--provider", "--model", "--reasoning-effort", "--timeout-minutes"].includes(token)) throw new Error(`Unexpected argument: ${token}`);
-    const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`Missing value for ${token}`);
-    if (token === "--provider") options.provider = value;
-    if (token === "--model") options.model = value;
-    if (token === "--reasoning-effort") options.reasoningEffort = value;
-    if (token === "--timeout-minutes") options.timeoutMinutes = Number(value);
-    index += 1;
-  }
+  const options = parseCliArgs(argv, {
+    valueFlags: {
+      "--provider": "provider",
+      "--model": "model",
+      "--reasoning-effort": "reasoningEffort",
+      "--timeout-minutes": "timeoutMinutes",
+    },
+    booleanFlags: { "--execute": "execute" },
+    defaults: { execute: false, provider: "ollama", model: null, reasoningEffort: "low", timeoutMinutes: 3 },
+  });
+  if (options.help) return options;
+  options.timeoutMinutes = Number(options.timeoutMinutes);
   if (!Number.isInteger(options.timeoutMinutes) || options.timeoutMinutes < 1 || options.timeoutMinutes > 30) {
     throw new Error("Timeout must be an integer from 1 to 30 minutes");
   }
@@ -123,16 +130,10 @@ function parseArgs(argv) {
   return options;
 }
 
-function terminateProcessTree(child) {
-  if (!child.pid || child.exitCode !== null) return;
-  if (process.platform === "win32") {
-    spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-  } else {
-    try { process.kill(-child.pid, "SIGTERM"); } catch {}
-  }
-}
-
-async function runWorker({ task, provider, model, reasoningEffort, runPath, timeoutMs, activeChildren }) {
+async function runWorker({
+  task, provider, model, reasoningEffort, runPath, timeoutMs, stateRoot,
+  tokenReservation, aggregateLimit, maxConcurrentWorkers,
+}) {
   const workerPath = path.join(runPath, task.id);
   mkdirSync(workerPath, { recursive: true });
   const eventsPath = path.join(workerPath, "events.jsonl");
@@ -149,37 +150,38 @@ async function runWorker({ task, provider, model, reasoningEffort, runPath, time
     prompt: task.prompt,
   }, null, 2)}\n`);
 
+  const taskId = `fleet-smoke-${task.id}`;
+  const slot = acquireWorkerSlot(stateRoot, maxConcurrentWorkers, { taskId, provider, model });
+  let preserveSlot = false;
+  let invocationId = null;
+  if (provider === "openai") {
+    try {
+      const admission = await reservePaidUsage({
+        stateRoot, aggregateLimit, reservedTokens: tokenReservation, taskId,
+        metadata: { provider, model, role: "fleet-smoke" },
+      });
+      invocationId = admission.invocationId;
+    } catch (error) {
+      slot.release();
+      throw error;
+    }
+  }
   const { command, args } = buildSmokeInvocation({ provider, model, reasoningEffort, outputPath });
   const startedAtMs = Date.now();
-  const child = spawn(command, args, {
-    cwd: ROOT,
-    detached: process.platform !== "win32",
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
-  });
-  activeChildren.add(child);
-  child.stdout.on("data", (chunk) => appendFileSync(eventsPath, chunk));
-  child.stderr.on("data", (chunk) => appendFileSync(stderrPath, chunk));
-  child.stdin.on("error", () => {});
-  child.stdin.end(task.prompt);
-
-  let timedOut = false;
-  const timer = setTimeout(() => {
-    timedOut = true;
-    terminateProcessTree(child);
-  }, timeoutMs);
-  let exitCode = null;
+  let processResult = { exitCode: null, timedOut: false, interrupted: null, pid: null };
   let error = null;
   try {
-    exitCode = await new Promise((resolve, reject) => {
-      child.once("error", reject);
-      child.once("close", resolve);
+    processResult = await superviseProcess({
+      command, args, cwd: ROOT, prompt: task.prompt, timeoutMs,
+      onStdout: (chunk) => appendFileSync(eventsPath, chunk),
+      onStderr: (chunk) => appendFileSync(stderrPath, chunk),
     });
   } catch (caught) {
     error = caught.message;
-  } finally {
-    clearTimeout(timer);
-    activeChildren.delete(child);
+    if (caught.code === "PROCESS_NOT_REAPED") {
+      preserveSlot = true;
+      slot.quarantine({ taskId, invocationId, reason: "fleet-smoke-not-reaped" });
+    }
   }
   const finishedAtMs = Date.now();
   const finalMessage = existsSync(outputPath) ? readFileSync(outputPath, "utf8").trim() : "";
@@ -193,25 +195,46 @@ async function runWorker({ task, provider, model, reasoningEffort, runPath, time
   }
   const result = {
     taskId: task.id,
-    pid: child.pid ?? null,
+    invocationId,
+    pid: processResult.pid,
     provider,
     model,
     startedAtMs,
     finishedAtMs,
     elapsedMs: finishedAtMs - startedAtMs,
-    exitCode,
-    timedOut,
+    exitCode: processResult.exitCode,
+    timedOut: processResult.timedOut,
+    interrupted: processResult.interrupted,
     usage,
     artifact,
     error,
-    passed: exitCode === 0 && !timedOut && !error && artifact !== null,
+    passed: processResult.exitCode === 0 && !processResult.timedOut && !processResult.interrupted
+      && !error && artifact !== null
+      && (provider !== "openai" || (usage !== null && usage.total_tokens <= tokenReservation)),
   };
+  if (provider === "openai" && usage?.total_tokens > tokenReservation) {
+    result.error = `fleet smoke used ${usage.total_tokens} tokens against ${tokenReservation} reserved`;
+  }
   writeFileSync(path.join(workerPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
+  try {
+    if (provider === "openai") {
+      await reconcilePaidUsage({
+        stateRoot, invocationId, taskId, usage,
+        metadata: { provider, model, role: "fleet-smoke", status: result.passed ? "process_completed" : "failed" },
+      });
+    }
+  } finally {
+    if (!preserveSlot) slot.release();
+  }
   return result;
 }
 
 export async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
+  if (options.help) {
+    printHelp(USAGE);
+    return null;
+  }
   const preview = {
     experiment: "two-read-only-workers",
     provider: options.provider,
@@ -227,40 +250,39 @@ export async function main(argv = process.argv.slice(2)) {
     return preview;
   }
 
-  const stateRoot = path.join(ROOT, ".codex-factory", "fleet-smoke");
+  const stateRoot = path.join(ROOT, ".codex-factory");
   mkdirSync(stateRoot, { recursive: true });
-  const lockPath = path.join(stateRoot, "fleet-smoke.lock");
-  let lockDescriptor;
-  try {
-    lockDescriptor = openSync(lockPath, "wx");
-    writeFileSync(lockDescriptor, JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }));
-  } catch (error) {
-    if (error.code === "EEXIST") throw new Error("Another fleet smoke test owns the lock");
-    throw error;
-  } finally {
-    if (lockDescriptor !== undefined) closeSync(lockDescriptor);
+  const smokeStateRoot = path.join(stateRoot, "fleet-smoke");
+  mkdirSync(smokeStateRoot, { recursive: true });
+  const smokeLock = await acquireFileLock(path.join(smokeStateRoot, "fleet-smoke.lock"), { provider: options.provider }, { timeoutMs: 1 });
+  const paidCandidate = options.provider === "openai"
+    ? CONFIG.candidates?.openai?.find((candidate) => candidate.model === options.model)
+    : null;
+  if (options.provider === "openai" && !paidCandidate) {
+    smokeLock.release();
+    throw new Error(`OpenAI smoke model ${options.model} is not a configured paid candidate`);
   }
 
   const runId = new Date().toISOString().replace(/[:.]/g, "-");
-  const runPath = path.join(stateRoot, "runs", runId);
+  const runPath = path.join(smokeStateRoot, "runs", runId);
   mkdirSync(runPath, { recursive: true });
-  const activeChildren = new Set();
-  const stopAll = () => {
-    for (const child of activeChildren) terminateProcessTree(child);
-  };
-  process.once("SIGINT", stopAll);
-  process.once("SIGTERM", stopAll);
   try {
     const wallStartedAtMs = Date.now();
-    const results = await Promise.all(TASKS.map((task) => runWorker({
+    const settled = await Promise.allSettled(TASKS.map((task) => runWorker({
       task,
       provider: options.provider,
       model: options.model,
       reasoningEffort: options.reasoningEffort,
       runPath,
       timeoutMs: options.timeoutMinutes * 60_000,
-      activeChildren,
+      stateRoot,
+      tokenReservation: paidCandidate?.tokenReservation ?? null,
+      aggregateLimit: CONFIG.budgets.aggregatePaidTokens,
+      maxConcurrentWorkers: CONFIG.budgets.maxConcurrentWorkers,
     })));
+    const rejected = settled.find((item) => item.status === "rejected");
+    if (rejected) throw rejected.reason;
+    const results = settled.map((item) => item.value);
     const wallFinishedAtMs = Date.now();
     const overlap = workersOverlap(results);
     const summary = {
@@ -279,16 +301,10 @@ export async function main(argv = process.argv.slice(2)) {
     if (!summary.allPassed) process.exitCode = 1;
     return summary;
   } finally {
-    process.removeListener("SIGINT", stopAll);
-    process.removeListener("SIGTERM", stopAll);
-    stopAll();
-    rmSync(lockPath, { force: true });
+    smokeLock.release();
   }
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  });
+  main().catch(reportCliError);
 }

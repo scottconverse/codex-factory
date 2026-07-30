@@ -5,9 +5,23 @@ import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,47}$/;
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const USAGE = `Usage:
+  node scripts/coordinator-intake.mjs (--prompt-file <file> | --prompt <text>)
+    (--repository <directory> | --bootstrap <new-directory>)
+    [--campaign-id <id>] [--base <revision>]
+
+Options:
+  --prompt-file <file>       Read the owner prompt or specification from a file.
+  --prompt <text>            Use an owner prompt directly.
+  --repository <directory>  Use an existing clean Git worktree.
+  --bootstrap <directory>   DANGEROUS: create and initialize a new repository.
+  --campaign-id <id>        Set the generated campaign identifier.
+  --base <revision>          Set the campaign base revision (default: HEAD).
+  -h, --help                 Show this help.`;
 
 function git(args, cwd, options = {}) {
   const result = spawnSync(process.platform === "win32" ? "git.exe" : "git", args, {
@@ -150,17 +164,15 @@ export function createCoordinatorIntake({ repository: target, promptFile, prompt
 }
 
 function parseArgs(argv) {
-  const options = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (!["--prompt-file", "--prompt", "--repository", "--bootstrap", "--campaign-id", "--base"].includes(token)) {
-      throw new Error(`Unexpected argument: ${token}`);
-    }
-    const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`Missing value for ${token}`);
-    options[token.slice(2).replaceAll("-", "_")] = value;
-    index += 1;
-  }
+  const options = parseCliArgs(argv, { valueFlags: {
+    "--prompt-file": "prompt_file",
+    "--prompt": "prompt",
+    "--repository": "repository",
+    "--bootstrap": "bootstrap",
+    "--campaign-id": "campaign_id",
+    "--base": "base",
+  } });
+  if (options.help) return options;
   if (Boolean(options.prompt_file) === Boolean(options.prompt)) throw new Error("Provide exactly one of --prompt-file or --prompt");
   if (Boolean(options.repository) === Boolean(options.bootstrap)) {
     throw new Error("Provide exactly one of --repository or --bootstrap");
@@ -170,6 +182,10 @@ function parseArgs(argv) {
 
 export async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
+  if (options.help) {
+    printHelp(USAGE);
+    return null;
+  }
   const promptFile = options.prompt_file ? path.resolve(options.prompt_file) : null;
   if (promptFile && (!existsSync(promptFile) || !lstatSync(promptFile).isFile())) throw new Error("--prompt-file must name a regular file");
   const repository = options.bootstrap ? bootstrapRepository(options.bootstrap) : path.resolve(options.repository);
@@ -185,8 +201,5 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  });
+  main().catch(reportCliError);
 }

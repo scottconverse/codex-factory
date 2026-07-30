@@ -23,23 +23,24 @@ import {
 } from "./factory-campaign.mjs";
 import { discoverCandidatePool, discoverOllama } from "./factory-fleet.mjs";
 import { validateConfig } from "./run-worker.mjs";
+import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const USAGE = `Usage:
+  node scripts/run-campaign.mjs --plan-file <file> [--execute]
+
+Options:
+  --plan-file <file>  Required coordinator-created campaign plan JSON.
+  --execute           DANGEROUS: dispatch and integrate the campaign; otherwise dry-run.
+  -h, --help          Show this help.`;
 
 function parseArgs(argv) {
-  const options = { execute: false };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--execute") {
-      options.execute = true;
-      continue;
-    }
-    if (token !== "--plan-file") throw new Error(`Unexpected argument: ${token}`);
-    const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error("Missing value for --plan-file");
-    options.planFile = value;
-    index += 1;
-  }
+  const options = parseCliArgs(argv, {
+    valueFlags: { "--plan-file": "planFile" },
+    booleanFlags: { "--execute": "execute" },
+    defaults: { execute: false },
+  });
+  if (options.help) return options;
   if (!options.planFile) throw new Error("Missing --plan-file");
   return options;
 }
@@ -244,7 +245,18 @@ async function executeLocalAttempt({ plan, task, attempt, repository, base, sour
   return runChild(process.execPath, [path.join(ROOT, "scripts", "run-local-patch.mjs"), "--task-file", taskPath, "--execute"], ROOT, activeChildren);
 }
 
-async function executeCodexAttempt({ plan, task, attempt, repository, base, source, runPath, config, activeChildren }) {
+async function executeCodexAttempt({
+  plan,
+  task,
+  attempt,
+  repository,
+  base,
+  source,
+  runPath,
+  config,
+  activeChildren,
+  launchWorker,
+}) {
   const deadlineMs = attempt.provider === "ollama"
     ? Date.now() + Math.min(plan.localAttemptMinutes ?? 3, 30) * 60_000
     : null;
@@ -259,7 +271,8 @@ async function executeCodexAttempt({ plan, task, attempt, repository, base, sour
   mkdirSync(path.dirname(promptPath), { recursive: true });
   writeFileSync(promptPath, taskPrompt(task, source));
   try {
-    const worker = await runChild(process.execPath, [
+    const workerCommand = process.execPath;
+    const workerArgs = [
       path.join(ROOT, "scripts", "run-worker.mjs"),
       "--task-id", taskId,
       "--role", task.role,
@@ -268,7 +281,20 @@ async function executeCodexAttempt({ plan, task, attempt, repository, base, sour
       "--cwd", worktreePath,
       "--prompt-file", promptPath,
       "--execute",
-    ], ROOT, activeChildren);
+    ];
+    const worker = launchWorker
+      ? await launchWorker({
+        command: workerCommand,
+        args: workerArgs,
+        cwd: ROOT,
+        activeChildren,
+        task,
+        attempt,
+        taskId,
+        worktreePath,
+        promptPath,
+      })
+      : await runChild(workerCommand, workerArgs, ROOT, activeChildren);
     if (worker.status !== "process_completed") throw new Error(`Worker ended with ${worker.status}`);
     assertSafeWritePaths(worktreePath, task.writePaths);
     const changed = [
@@ -304,9 +330,14 @@ async function executeCodexAttempt({ plan, task, attempt, repository, base, sour
   }
 }
 
-export async function main(argv = process.argv.slice(2)) {
-  const options = parseArgs(argv);
-  const planPath = path.resolve(options.planFile);
+export async function runCampaign({
+  planFile,
+  execute = false,
+  stateRoot = ROOT,
+  resolveAttempts,
+  launchWorker,
+}) {
+  const planPath = path.resolve(planFile);
   const plan = validateCampaign(JSON.parse(readFileSync(planPath, "utf8")));
   const repository = gitRoot(path.resolve(plan.repository));
   const sourcePath = plan.sourceFile ? resolveCampaignSource(repository, plan.sourceFile) : null;
@@ -320,7 +351,9 @@ export async function main(argv = process.argv.slice(2)) {
   const qualifications = readJsonLines(path.join(ROOT, ".codex-factory", "qualifications.jsonl"));
   const ladders = Object.fromEntries(plan.tasks.map((task) => [
     task.id,
-    buildAttemptLadder({ task, candidates, qualifications, routes: config.routes }),
+    resolveAttempts
+      ? resolveAttempts({ task, plan, candidates, qualifications, config })
+      : buildAttemptLadder({ task, candidates, qualifications, routes: config.routes }),
   ]));
   const preview = {
     campaignId: plan.campaignId,
@@ -334,16 +367,13 @@ export async function main(argv = process.argv.slice(2)) {
       parallelSafe: task.parallelSafe,
       attempts: ladders[task.id].map(({ provider, model }) => ({ provider, model })),
     })),
-    execute: options.execute,
+    execute,
   };
-  if (!options.execute) {
-    process.stdout.write(`${JSON.stringify(preview, null, 2)}\n`);
-    return preview;
-  }
+  if (!execute) return preview;
 
   const startedAt = new Date();
   const runId = `${startedAt.toISOString().replace(/[:.]/g, "-")}-${plan.campaignId}`;
-  const runPath = path.join(ROOT, ".codex-factory", "campaigns", runId);
+  const runPath = path.join(path.resolve(stateRoot), ".codex-factory", "campaigns", runId);
   const integrationPath = path.join(runPath, "integration");
   const integrationBranch = `codex-factory/campaign-${plan.campaignId}-${startedAt.getTime()}`;
   const unintegrated = new Set();
@@ -353,8 +383,10 @@ export async function main(argv = process.argv.slice(2)) {
     interrupted ??= new Error(`Campaign interrupted by ${signal}`);
     for (const child of activeChildren) terminateChild(child);
   };
-  process.once("SIGINT", () => interrupt("SIGINT"));
-  process.once("SIGTERM", () => interrupt("SIGTERM"));
+  const onSigint = () => interrupt("SIGINT");
+  const onSigterm = () => interrupt("SIGTERM");
+  process.once("SIGINT", onSigint);
+  process.once("SIGTERM", onSigterm);
   mkdirSync(runPath, { recursive: true });
   writeFileSync(path.join(runPath, "request.json"), `${JSON.stringify({ ...preview, execute: true, planPath }, null, 2)}\n`);
   if (interrupted) throw interrupted;
@@ -370,7 +402,7 @@ export async function main(argv = process.argv.slice(2)) {
           attempts: ladders[task.id],
           executeAttempt: async (_task, attempt) => {
             if (interrupted) throw interrupted;
-            const context = { plan, task, attempt, repository, base, source, runPath, config, activeChildren };
+            const context = { plan, task, attempt, repository, base, source, runPath, config, activeChildren, launchWorker };
             const result = attempt.runner === "local-patch"
               ? await executeLocalAttempt(context)
               : await executeCodexAttempt(context);
@@ -405,7 +437,6 @@ export async function main(argv = process.argv.slice(2)) {
       finishedAt: new Date().toISOString(),
     };
     writeFileSync(path.join(runPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
-    process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return result;
   } catch (error) {
     for (const result of unintegrated) {
@@ -431,13 +462,26 @@ export async function main(argv = process.argv.slice(2)) {
     writeFileSync(path.join(runPath, "result.json"), `${JSON.stringify(failure, null, 2)}\n`);
     throw error;
   } finally {
+    process.removeListener("SIGINT", onSigint);
+    process.removeListener("SIGTERM", onSigterm);
     for (const child of activeChildren) terminateChild(child);
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
+export async function main(argv = process.argv.slice(2)) {
+  const options = parseArgs(argv);
+  if (options.help) {
+    printHelp(USAGE);
+    return null;
+  }
+  const result = await runCampaign({
+    planFile: options.planFile,
+    execute: options.execute,
   });
+  process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
+  return result;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch(reportCliError);
 }

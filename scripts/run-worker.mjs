@@ -6,31 +6,52 @@ import {
   readFileSync,
   writeFileSync,
 } from "node:fs";
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
-import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
+import { acquireWorkerSlot } from "./factory-slots.mjs";
+import {
+  reconcilePaidUsage,
+  reservePaidUsage,
+  summarizeLedger,
+  usageSpent,
+} from "./factory-admission.mjs";
+import { superviseProcess } from "./factory-process.mjs";
+import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const USAGE = `Usage:
+  node scripts/run-worker.mjs --task-id <id> --role <role> --cwd <directory>
+    --prompt-file <file> [--candidate-id <id>] [--timeout-minutes <minutes>]
+    [--config <file>] [--execute]
+
+Options:
+  --task-id <id>              Required single-use task identifier.
+  --role <role>               Required configured worker role.
+  --cwd <directory>           Required target Git worktree.
+  --prompt-file <file>        Required bounded worker prompt.
+  --candidate-id <id>         Pin an exactly qualified candidate.
+  --timeout-minutes <minutes> Bound worker wall-clock time.
+  --config <file>             Use an alternate factory configuration.
+  --execute                   DANGEROUS: launch the selected worker; otherwise dry-run.
+  -h, --help                  Show this help.`;
 
 export function parseArgs(argv) {
-  const parsed = { execute: false };
-  for (let index = 0; index < argv.length; index += 1) {
-    const token = argv[index];
-    if (token === "--execute") {
-      parsed.execute = true;
-      continue;
-    }
-    if (!token.startsWith("--")) throw new Error(`Unexpected argument: ${token}`);
-    const key = token.slice(2).replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
-    const value = argv[index + 1];
-    if (!value || value.startsWith("--")) throw new Error(`Missing value for ${token}`);
-    parsed[key] = value;
-    index += 1;
-  }
-  return parsed;
+  return parseCliArgs(argv, {
+    valueFlags: {
+      "--task-id": "taskId",
+      "--role": "role",
+      "--cwd": "cwd",
+      "--prompt-file": "promptFile",
+      "--candidate-id": "candidateId",
+      "--timeout-minutes": "timeoutMinutes",
+      "--config": "config",
+    },
+    booleanFlags: { "--execute": "execute" },
+    defaults: { execute: false },
+  });
 }
 
 export function validateConfig(config) {
@@ -122,34 +143,13 @@ export function summarizeUsage(eventsText) {
   return { ...usage, total_tokens: inputTokens + outputTokens };
 }
 
-export function summarizeLedger(ledgerText, paid) {
-  const latestByTask = new Map();
-  for (const line of ledgerText.split(/\r?\n/).filter(Boolean)) {
-    const entry = JSON.parse(line);
-    if (entry.paid === paid) latestByTask.set(entry.taskId, entry);
-  }
-  return [...latestByTask.values()].reduce((total, entry) => {
-    if (entry.stage === "reserved") {
-      if (!Number.isSafeInteger(entry.reservedTokens)) throw new Error("Usage ledger contains an invalid reservation");
-      return total + entry.reservedTokens;
-    }
-    if (!Number.isSafeInteger(entry.usage?.total_tokens)) {
-      if (paid) throw new Error("Paid usage ledger contains a run without trustworthy token usage");
-      return total;
-    }
-    return total + entry.usage.total_tokens;
-  }, 0);
-}
+export { summarizeLedger };
 
 export function classifyResult({ processResult, executionError, usage, finalMessage, tokenReservation }) {
   if (processResult.timedOut) return "timed_out";
   if (executionError || processResult.interrupted || processResult.exitCode !== 0 || !usage || !finalMessage.trim()) return "failed";
   if (usage.total_tokens > tokenReservation) return "over_budget";
   return "process_completed";
-}
-
-function usageSpent(ledgerPath, paid) {
-  return existsSync(ledgerPath) ? summarizeLedger(readFileSync(ledgerPath, "utf8"), paid) : 0;
 }
 
 function readJsonLines(filename) {
@@ -168,74 +168,24 @@ function assertGitRepository(cwd) {
   if (check.status !== 0) throw new Error(`Worker cwd must be a Git repository: ${cwd}`);
 }
 
-function terminateOwnedProcessTree(child) {
-  if (!child.pid || child.exitCode !== null) return true;
-  if (process.platform === "win32") {
-    const result = spawnSync("taskkill", ["/PID", String(child.pid), "/T", "/F"], { windowsHide: true, stdio: "ignore" });
-    return result.status === 0 || child.exitCode !== null;
-  } else {
-    try {
-      process.kill(-child.pid, "SIGTERM");
-      return true;
-    } catch {
-      return child.exitCode !== null;
-    }
-  }
-}
-
 async function executeWorker({ invocation, prompt, timeoutMs, eventsPath, stderrPath }) {
-  const child = spawn(invocation.command, invocation.args, {
+  return superviseProcess({
+    command: invocation.command,
+    args: invocation.args,
     cwd: ROOT,
-    detached: process.platform !== "win32",
-    stdio: ["pipe", "pipe", "pipe"],
-    windowsHide: true,
+    prompt,
+    timeoutMs,
+    onStdout: (chunk) => appendFileSync(eventsPath, chunk),
+    onStderr: (chunk) => appendFileSync(stderrPath, chunk),
   });
-  child.stdout.on("data", (chunk) => appendFileSync(eventsPath, chunk));
-  child.stderr.on("data", (chunk) => appendFileSync(stderrPath, chunk));
-  let timedOut = false;
-  const completion = new Promise((resolve, reject) => {
-    child.once("error", reject);
-    child.once("close", (code) => resolve(code));
-  });
-  child.stdin.on("error", () => {});
-  child.stdin.end(prompt);
-  let interrupted = null;
-  let rejectUnreaped;
-  const unreaped = new Promise((_, reject) => { rejectUnreaped = reject; });
-  let reapDeadline = null;
-  const requestTermination = (reason) => {
-    if (reason !== "timeout") interrupted = reason;
-    terminateOwnedProcessTree(child);
-    if (!reapDeadline) {
-      reapDeadline = setTimeout(() => {
-        const error = new Error(`Worker process tree was not reaped after ${reason}`);
-        error.code = "WORKER_NOT_REAPED";
-        rejectUnreaped(error);
-      }, 10_000);
-    }
-  };
-  const onSigint = () => requestTermination("SIGINT");
-  const onSigterm = () => requestTermination("SIGTERM");
-  process.once("SIGINT", onSigint);
-  process.once("SIGTERM", onSigterm);
-  const timer = setTimeout(() => {
-    timedOut = true;
-    requestTermination("timeout");
-  }, timeoutMs);
-  let exitCode;
-  try {
-    exitCode = await Promise.race([completion, unreaped]);
-  } finally {
-    clearTimeout(timer);
-    if (reapDeadline) clearTimeout(reapDeadline);
-    process.removeListener("SIGINT", onSigint);
-    process.removeListener("SIGTERM", onSigterm);
-  }
-  return { exitCode, timedOut, interrupted };
 }
 
 export async function main(argv = process.argv.slice(2)) {
   const options = parseArgs(argv);
+  if (options.help) {
+    printHelp(USAGE);
+    return null;
+  }
   for (const required of ["taskId", "role", "cwd", "promptFile"]) {
     if (!options[required]) throw new Error(`Missing --${required.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`)}`);
   }
@@ -303,7 +253,6 @@ export async function main(argv = process.argv.slice(2)) {
   });
   let preserveLock = false;
   try {
-    let ledgerLock = await acquireFileLock(path.join(stateRoot, "usage.lock"), { taskId: options.taskId });
     let lockedSpent;
     let lockedRemaining;
     let runId;
@@ -313,13 +262,22 @@ export async function main(argv = process.argv.slice(2)) {
     let stderrPath;
     let exactInvocation;
     let startedAt;
-    try {
+    let invocationId = null;
+    if (route.paid) {
+      const admission = await reservePaidUsage({
+        stateRoot,
+        aggregateLimit,
+        reservedTokens: route.tokenReservation,
+        taskId: options.taskId,
+        rejectTaskReuse: true,
+        metadata: { role: options.role, provider: route.provider, model: route.model },
+      });
+      ({ invocationId, spent: lockedSpent, remaining: lockedRemaining } = admission);
+    } else {
       if (taskWasAttempted(ledgerPath, options.taskId)) throw new Error(`Task ${options.taskId} already has an attempt`);
-      lockedSpent = route.paid ? usageSpent(ledgerPath, true) : null;
-      lockedRemaining = route.paid ? aggregateLimit - lockedSpent : null;
-      if (route.paid && route.tokenReservation > lockedRemaining) {
-        throw new Error(`Route reservation ${route.tokenReservation} exceeds remaining budget ${lockedRemaining}`);
-      }
+      lockedSpent = null;
+      lockedRemaining = null;
+    }
       const executionPreview = { ...preview, spent: lockedSpent, remaining: lockedRemaining };
 
       startedAt = new Date();
@@ -333,20 +291,11 @@ export async function main(argv = process.argv.slice(2)) {
       writeFileSync(path.join(runPath, "request.json"), `${JSON.stringify({ ...executionPreview, args: exactInvocation.args, promptPath, startedAt: startedAt.toISOString() }, null, 2)}\n`);
       writeFileSync(eventsPath, "");
       writeFileSync(stderrPath, "");
-      appendFileSync(ledgerPath, `${JSON.stringify({
-        stage: "reserved",
-        runId,
-        taskId: options.taskId,
-        role: options.role,
-        provider: route.provider,
-        model: route.model,
-        paid: route.paid,
-        reservedTokens: route.paid ? route.tokenReservation : null,
+      if (!route.paid) appendFileSync(ledgerPath, `${JSON.stringify({
+        stage: "reserved", invocationId: runId, runId, taskId: options.taskId, role: options.role,
+        provider: route.provider, model: route.model, paid: false, reservedTokens: null,
         startedAt: startedAt.toISOString(),
       })}\n`);
-    } finally {
-      ledgerLock.release();
-    }
 
     let processResult;
     let executionError = null;
@@ -361,7 +310,7 @@ export async function main(argv = process.argv.slice(2)) {
     } catch (error) {
       executionError = error;
       processResult = { exitCode: null, timedOut: false, interrupted: null };
-      if (error.code === "WORKER_NOT_REAPED") {
+      if (error.code === "PROCESS_NOT_REAPED") {
         preserveLock = true;
         slot.quarantine({ taskId: options.taskId, runId, reason: "worker-not-reaped" });
       }
@@ -379,6 +328,7 @@ export async function main(argv = process.argv.slice(2)) {
     });
     const result = {
       runId,
+      invocationId: invocationId ?? runId,
       taskId: options.taskId,
       role: options.role,
       provider: route.provider,
@@ -395,12 +345,12 @@ export async function main(argv = process.argv.slice(2)) {
       runPath,
     };
     writeFileSync(path.join(runPath, "result.json"), `${JSON.stringify(result, null, 2)}\n`);
-    ledgerLock = await acquireFileLock(path.join(stateRoot, "usage.lock"), { taskId: options.taskId, stage: "terminal" });
-    try {
-      appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
-    } finally {
-      ledgerLock.release();
-    }
+    if (route.paid) {
+      await reconcilePaidUsage({
+        stateRoot, invocationId, taskId: options.taskId, usage,
+        metadata: { ...result, invocationId, stage: "terminal" },
+      });
+    } else appendFileSync(ledgerPath, `${JSON.stringify(result)}\n`);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     if (status !== "process_completed") process.exitCode = 1;
     return result;
@@ -410,8 +360,5 @@ export async function main(argv = process.argv.slice(2)) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
-  main().catch((error) => {
-    process.stderr.write(`${error.message}\n`);
-    process.exitCode = 1;
-  });
+  main().catch(reportCliError);
 }

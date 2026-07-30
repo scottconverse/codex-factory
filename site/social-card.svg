@@ -12,9 +12,8 @@
     <path d="M35 27h9v20h-9zM10 57h52" stroke="#df6338" stroke-width="4"/>
   </g>
   <text x="174" y="116" fill="#17201c" font-family="Segoe UI,sans-serif" font-size="30" font-weight="700">CODEX FACTORY</text>
-  <text x="1070" y="112" fill="#a63f20" font-family="Consolas,monospace" font-size="22">0.1.1</text>
-  <text x="78" y="250" fill="#17201c" font-family="Georgia,serif" font-size="71">Build a worker roster from</text>
-  <text x="78" y="334" fill="#a63f20" font-family="Georgia,serif" font-size="71">what actually passes.</text>
-  <text x="78" y="425" fill="#59635d" font-family="Segoe UI,sans-serif" font-size="27">Discover · qualify · route · supervise · retain</text>
-  <text x="78" y="574" fill="#dce7e1" font-family="Consolas,monospace" font-size="22">FREE LOCAL CAPACITY FIRST  /  ONE BOUNDED SHIFT  /  DURABLE RECEIPTS</text>
+  <text x="78" y="250" fill="#17201c" font-family="Georgia,serif" font-size="71">Coordinate from your</text>
+  <text x="78" y="334" fill="#a63f20" font-family="Georgia,serif" font-size="71">software request.</text>
+  <text x="78" y="425" fill="#59635d" font-family="Segoe UI,sans-serif" font-size="27">Prompt · inspect · plan · preview · dispatch · accept</text>
+  <text x="78" y="574" fill="#dce7e1" font-family="Consolas,monospace" font-size="22">QUALIFIED LOCAL FIRST  /  LUNA THEN TERRA  /  DURABLE RECEIPTS</text>
 </svg>

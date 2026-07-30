@@ -2,14 +2,20 @@
 
 Last tested: 2026-07-29
 
-This is a narrow concurrency smoke test, not a general coding benchmark. Every
+> Historical evidence snapshot. Runtime routing does not use this document as
+> an allowlist. The latest qualification record for the exact provider,
+> model, runtime, adapter, harness, and role fingerprint is authoritative;
+> changing any component requires qualification again.
+
+This was a narrow concurrency smoke test, not a general coding benchmark. Every
 rung received the same two embedded repository excerpts and had to return two
 exact JSON artifacts while both worker processes overlapped.
 
 ## Preferred ladder
 
-1. `qwen3.5:9b` through Ollama for free, read-only, embedded-context mechanical
-   work.
+1. `qwen3.5:9b` through Ollama for the roles supported by the latest exact
+   fingerprint qualification. The historical trials below initially supported
+   read-only work; later current-host evidence added structured writes.
 2. `gpt-5.6-luna` at low reasoning for the first Codex fallback.
 3. `gpt-5.6-terra` at low reasoning when Luna is unsuitable or the task needs a
    stronger implementation model.
@@ -67,8 +73,10 @@ A later disposable-worktree trial requested two concurrent writes:
   passing test, or commit.
 
 Both processes overlapped and exited, but the integrated acceptance path did
-not run because neither worker produced a candidate. This keeps the ladder
-unchanged for read-only work and leaves writable coding unqualified.
+not run because neither worker produced a candidate. At that point this kept
+the ladder unchanged for read-only work and left writable coding unqualified.
+Later exact-fingerprint qualification superseded that disposition; runtime
+admission always follows the qualification ledger.
 
 ## Structured local patch qualification
 
@@ -79,7 +87,7 @@ only on green.
 
 | Model | Result | Wall time | Token telemetry | Disposition |
 |---|---:|---:|---:|---|
-| `qwen3.5:9b` | 0/3 across JSON-diff and structured-file trials | 26.6s, 37.4s, 17.8s | 419, 582, 389 | Keep read-only: unreliable coding artifact |
+| `qwen3.5:9b` | 0/3 across early JSON-diff and structured-file trials | 26.6s, 37.4s, 17.8s | 419, 582, 389 | Historical failure; superseded for matching later exact fingerprints |
 | `gemma4:12b` | 1/1 | 50.4s | 470 | Qualify for constrained structured-file patch tasks |
 
 The accepted Gemma candidate changed one allowlisted file, passed the exact

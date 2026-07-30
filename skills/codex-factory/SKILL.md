@@ -5,7 +5,9 @@ description: Discover, qualify, select, and supervise bounded software workers a
 
 # Codex Factory
 
-The current top-level Codex session is the coordinator. The owner supplies a
+The currently selected model in the top-level Codex task is the coordinator.
+Luna and Terra are fallback workers unless the owner deliberately selected one
+as that top-level model. The owner supplies a
 prompt, specification, or plan in normal language; the coordinator owns the
 internal task plan. Never ask the owner to write Factory JSON.
 

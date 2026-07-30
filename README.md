@@ -33,7 +33,7 @@ process tree, and retains selection and execution evidence.
   only on green;
 - Codex plugin metadata and an operator skill.
 
-## Quick start
+## Coordinate from an owner prompt
 
 Requirements: Node.js 24+, Git, and Codex CLI. Ollama is required for local
 candidate discovery and qualification.
@@ -42,48 +42,39 @@ candidate discovery and qualification.
 git clone https://github.com/scottconverse/codex-factory.git
 cd codex-factory
 npm.cmd run check
-npm.cmd run fleet:qualify
-
-node scripts/run-worker.mjs `
-  --task-id inspect-repo `
-  --role local-read `
-  --cwd . `
-  --prompt-file examples/inventory.prompt.md
 ```
 
-`fleet:qualify` previews every applicable candidate/harness pair without model
-inference. Add `--execute` to qualify free local candidates; paid Codex
-candidates additionally require `--include-paid`.
+Open this checkout as the workspace for a new top-level Codex task. Tell the
+currently selected Codex model:
 
-The worker command is also a dry run. It prints the selected currently qualified
-model, provider, reasoning effort,
-sandbox, applicable token policy, timeout, and exact CLI arguments with
-`"execute": false`. Add `--execute` only after the preview matches the intended
-task.
+```text
+Read skills/codex-factory/SKILL.md completely and use it to coordinate this request.
+Target repository: C:\work\my-project
+Request: Add a health-check endpoint with tests.
+```
 
-See the [user manual](docs/USER-MANUAL.md) for task contracts, route details,
-execution, receipts, recovery, and troubleshooting.
+The selected model in that top-level task is the coordinator. It inspects the
+repository, decides whether decomposition helps, creates the private
+`campaign.json`, previews worker routes, integrates accepted results, and keeps
+the owner-facing conversation. The owner does not write Factory JSON. Use a
+clean target worktree: intake refuses tracked uncommitted owner changes rather
+than stashing, resetting, or silently omitting them.
 
-## Coordinate from a prompt
+When no target repository exists, give the coordinator one explicit destination
+that does not exist:
 
-Use the Codex Factory skill in the top-level Codex session and give it the
-owner request in normal language. That session is the coordinator: it inspects
-the repository, decides whether decomposition helps, writes its internal plan,
-and keeps integration and acceptance in the primary context. The owner does
-not write a campaign JSON file. The target must have no tracked uncommitted
-changes; Factory preserves owner work rather than incorporating it into a
-campaign base.
+```text
+Read skills/codex-factory/SKILL.md completely and use it to coordinate this request.
+New project destination: C:\work\new-project
+Request: Build a small command-line timer.
+```
 
-For the underlying coordinator intake, provide an existing repository:
+Factory refuses to replace any existing bootstrap destination.
+
+The low-level intake command is for debugging or manual operation:
 
 ```powershell
 node scripts/coordinator-intake.mjs --repository C:\work\my-project --prompt "Add a health-check endpoint with tests."
-```
-
-Or bootstrap a genuinely new project at an exact new path:
-
-```powershell
-node scripts/coordinator-intake.mjs --bootstrap C:\work\new-project --prompt "Build a small command-line timer."
 ```
 
 The intake produces a private source and a reserved internal plan path below
@@ -96,6 +87,9 @@ a fast local failure falls back to `gpt-5.6-luna`, then `gpt-5.6-terra`, when
 those exact routes are currently qualified and admitted by the paid ledger.
 Execution creates an isolated integration worktree and never merges it into the
 owner branch automatically.
+
+See the [user manual](docs/USER-MANUAL.md) for the complete coordinator journey,
+qualification, routes, receipts, recovery, and FAQ.
 
 ## Important boundary
 
@@ -134,6 +128,10 @@ Candidate availability is discovered rather than hardcoded. Qualification is
 role scoped: a model may qualify for analysis and fail structured writes without
 being removed from the fleet. The current host must qualify its exact runtime
 fingerprints before routing begins.
+
+The prompt-driven coordinator work on `main` after the `v0.1.3` tag is
+**Unreleased**. Package and site version labels remain at the latest published
+release until the owner selects the next version.
 
 ## Project documents
 

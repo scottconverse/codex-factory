@@ -4,6 +4,18 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+### Added
+
+- Prompt-driven coordination from a normal-language owner request. The active
+  selected model in the top-level Codex task creates the private campaign plan;
+  owners do not author campaign JSON.
+- Safe bootstrap intake for an explicit new project destination.
+
+### Changed
+
+- Public onboarding now starts with the owner-prompt journey and identifies
+  post-`v0.1.3` coordinator work as unreleased.
+
 ## [0.1.3] - 2026-07-29
 
 ### Fixed

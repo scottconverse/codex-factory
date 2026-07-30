@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Codex Factory qualifies local and Codex workers, coordinates bounded dependency-safe campaigns, and retains receipts.">
+  <meta name="description" content="Give a software request to the selected Codex coordinator; it plans privately, routes bounded local/Luna/Terra workers, and retains receipts.">
   <meta name="theme-color" content="#f2efe6">
-  <meta property="og:title" content="Codex Factory — build a worker roster from evidence">
-  <meta property="og:description" content="Discover, qualify, route, and supervise bounded AI software workers. Free local capacity first; evidence always.">
+  <meta property="og:title" content="Codex Factory — coordinate from an owner prompt">
+  <meta property="og:description" content="The selected Codex model plans privately, routes qualified bounded workers, integrates accepted results, and retains evidence.">
   <meta property="og:type" content="website">
   <meta property="og:image" content="social-card.svg">
-  <title>Codex Factory — build a worker roster from evidence</title>
+  <title>Codex Factory — coordinate from an owner prompt</title>
   <link rel="icon" href="mark.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
   <script src="app.js" defer></script>
@@ -29,6 +29,7 @@
         <span></span><span></span>
       </button>
       <div class="nav-links" id="nav-links">
+        <a href="#coordinate">Start</a>
         <a href="#workflow">How it works</a>
         <a href="#controls">Controls</a>
         <a href="#status">Boundaries</a>
@@ -41,12 +42,12 @@
   <main id="main">
     <section class="hero shell" id="top">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="signal"></span> Experimental local coordinator · v0.1.3</p>
-        <h1>Build a worker roster from what <em>actually passes.</em></h1>
-        <p class="lede">Codex Factory inventories available Ollama and configured Codex models, qualifies each exact candidate for specific work, then coordinates bounded dependency-safe campaigns with durable receipts.</p>
+        <p class="eyebrow"><span class="signal"></span> Prompt-driven coordinator · Unreleased after v0.1.3</p>
+        <h1>Give your software request to a coordinator that <em>delegates from evidence.</em></h1>
+        <p class="lede">Describe the change in normal language. The selected Codex model inspects or safely bootstraps the repository, creates a private dependency plan, previews qualified local/Luna/Terra routes, and retains an isolated integration branch with receipts.</p>
         <div class="hero-actions">
-          <a class="button" href="#quick-start">Qualify your fleet</a>
-          <a class="text-link" href="https://github.com/scottconverse/codex-factory">Explore the code <span aria-hidden="true">→</span></a>
+          <a class="button" href="#coordinate">Coordinate from a prompt</a>
+          <a class="text-link" href="#quick-start">Qualify worker candidates <span aria-hidden="true">→</span></a>
         </div>
         <ul class="hero-facts" aria-label="Operating facts">
           <li><strong>Local first</strong><span>when a free candidate is qualified</span></li>
@@ -55,7 +56,7 @@
         </ul>
       </div>
 
-      <div class="roster-board" aria-label="Qualification results from the tested development host">
+      <div class="roster-board">
         <div class="board-head">
           <div>
             <span class="board-kicker">LOCAL QUALIFICATION RUN</span>
@@ -69,21 +70,21 @@
           <div><strong>48</strong><span>role checks executed</span></div>
           <div><strong>7</strong><span>write-ready on this host</span></div>
         </div>
-        <div class="candidate-list">
-          <div class="candidate-row candidate-heading">
-            <span>Candidate</span><span>Analysis</span><span>Benchmark</span><span>Write</span>
-          </div>
-          <div class="candidate-row">
-            <strong>qwen3.5:9b</strong><span class="pass">Pass</span><span class="pass">Pass</span><span class="pass">Pass</span>
-          </div>
-          <div class="candidate-row">
-            <strong>gemma4:12b</strong><span class="pass">Pass</span><span class="pass">Pass</span><span class="pass">Pass</span>
-          </div>
-          <div class="candidate-row">
-            <strong>nomic-embed-text</strong><span class="na">Inventory only</span><span class="dash">—</span><span class="dash">—</span>
-          </div>
+        <p class="candidate-scroll-hint">Swipe or scroll to see all role results <span aria-hidden="true">→</span></p>
+        <div class="candidate-scroll" role="region" aria-label="Candidate qualification results; scroll horizontally for all roles" tabindex="0">
+          <table class="candidate-table">
+            <caption>Candidate qualification results from the tested development host</caption>
+            <thead>
+              <tr><th scope="col">Candidate</th><th scope="col">Analysis</th><th scope="col">Benchmark</th><th scope="col">Write</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">qwen3.5:9b</th><td class="pass">Pass</td><td class="pass">Pass</td><td class="pass">Pass</td></tr>
+              <tr><th scope="row">gemma4:12b</th><td class="pass">Pass</td><td class="pass">Pass</td><td class="pass">Pass</td></tr>
+              <tr><th scope="row">nomic-embed-text</th><td class="na">Inventory only</td><td class="dash">—</td><td class="dash">—</td></tr>
+            </tbody>
+          </table>
         </div>
-        <p class="board-note">Observed on the development host with Ollama 0.32.4. Results are fingerprinted and must be rerun when the model, runtime, adapter, or harness changes.</p>
+        <p class="board-note">Snapshot observed 2026-07-29 on the development host with Ollama 0.32.4. Runtime routing uses the latest record for the exact model, runtime, adapter, harness, and role fingerprint; changing one requires qualification again.</p>
       </div>
     </section>
 
@@ -97,16 +98,16 @@
       </div>
     </section>
 
-    <section class="problem shell section">
-      <div class="section-tag">01 / Why it exists</div>
+    <section class="problem shell section" id="coordinate">
+      <div class="section-tag">01 / Start with the owner request</div>
       <div class="problem-grid">
         <div>
-          <p class="eyebrow">Model names are not capability evidence</p>
-          <h2>Stop guessing which worker should get the job.</h2>
+          <p class="eyebrow">The selected top-level model coordinates</p>
+          <h2>You provide the request. The coordinator creates the private plan.</h2>
         </div>
         <div class="problem-copy">
-          <p>A model can summarize correctly and still fail to return a safe file patch. A candidate can pass today and become stale after a runtime or harness change. A cheap worker is not cheap if it spins without producing a usable artifact.</p>
-          <p>Codex Factory turns those differences into an operator-visible roster. Qualification is tied to the exact candidate and role, selection prefers qualified free local capacity, and paid routes remain explicitly budget-gated.</p>
+          <p>Open the Factory checkout in a top-level Codex task. Tell the selected model to read <code>skills/codex-factory/SKILL.md</code>, give it the target path and your request, then continue in that task.</p>
+          <p>The coordinator inspects an existing clean repository or bootstraps one explicit new destination, creates <code>campaign.json</code> privately, previews bounded routes, runs only authorized workers, integrates accepted commits, and returns evidence for your review. You never author Factory JSON.</p>
         </div>
       </div>
     </section>
@@ -116,28 +117,32 @@
         <div class="section-tag light-tag">02 / The operating loop</div>
         <div class="section-heading inverse">
           <p class="eyebrow">A small control plane around existing runtimes</p>
-          <h2>Discover. Qualify. Route. Supervise. Retain.</h2>
+          <h2>Prompt. Inspect. Plan. Preview. Dispatch. Accept.</h2>
         </div>
         <ol class="factory-line">
           <li>
             <span class="step-number">01</span>
-            <div><h3>Discover the floor</h3><p>Inventory every installed Ollama model and the Codex candidates declared by the operator. Embedding-only models remain visible but are not invoked as workers.</p></div>
+            <div><h3>Give the owner prompt</h3><p>Supply a normal-language request and an existing repository or one explicit new destination. The selected top-level Codex model is the coordinator.</p></div>
           </li>
           <li>
             <span class="step-number">02</span>
-            <div><h3>Qualify exact roles</h3><p>Run analysis, reasoning benchmark, structured-write, or workspace-write harnesses. The latest result for the exact fingerprint wins.</p></div>
+            <div><h3>Inspect or bootstrap</h3><p>Preserve owner work. Intake requires a clean repository or refuses to overwrite any existing bootstrap destination.</p></div>
           </li>
           <li>
             <span class="step-number">03</span>
-            <div><h3>Select by policy</h3><p>Require the right role and tier, then prefer a qualified free local candidate before metered Codex capacity.</p></div>
+            <div><h3>Create the private plan</h3><p>The coordinator decides whether decomposition helps and writes task scopes, checks, dependencies, and safe parallelism under ignored Factory state.</p></div>
           </li>
           <li>
             <span class="step-number">04</span>
-            <div><h3>Run bounded shifts</h3><p>Preview first. Independent tasks may share configured worker slots; each local attempt is short, then falls back to Luna and Terra when qualified and admitted.</p></div>
+            <div><h3>Preview bounded routes</h3><p>Qualified local capacity comes first. A short local failure may fall back to Luna, then Terra, only when qualified and admitted.</p></div>
           </li>
           <li>
             <span class="step-number">05</span>
-            <div><h3>Keep the receipt</h3><p>Retain the request, events, diagnostics, final message, terminal result, and usage record for coordinator acceptance.</p></div>
+            <div><h3>Dispatch bounded workers</h3><p>Independent non-overlapping tasks may share configured slots. Every worker is a scoped leaf with one attempt and retained receipts.</p></div>
+          </li>
+          <li>
+            <span class="step-number">06</span>
+            <div><h3>Accept the integration evidence</h3><p>The coordinator integrates only accepted results, reruns acceptance checks, and keeps the integration branch separate from the owner branch.</p></div>
           </li>
         </ol>
       </div>
@@ -186,7 +191,7 @@
         </div>
         <div class="route-table" role="region" aria-label="Default role policies" tabindex="0">
           <table>
-            <thead><tr><th>Work</th><th>Minimum tier</th><th>Required evidence</th><th>Access</th></tr></thead>
+            <thead><tr><th scope="col">Work</th><th scope="col">Minimum tier</th><th scope="col">Required evidence</th><th scope="col">Access</th></tr></thead>
             <tbody>
               <tr><td>Mechanical</td><td>Economy</td><td>Analysis</td><td>Read-only</td></tr>
               <tr><td>Standard</td><td>Economy</td><td>Workspace write</td><td>Workspace-write</td></tr>
@@ -277,7 +282,7 @@
             <li>Exact, role-scoped qualification fingerprints</li>
             <li>Free-local-first selection from the qualified pool</li>
             <li>Constrained local structured-file patch path</li>
-            <li>One owned worker process with timeout and receipts</li>
+            <li>Owned process tree per worker, with three configured slots, timeout, and receipts</li>
           </ul>
         </div>
         <div class="boundary-not">
@@ -299,11 +304,12 @@
     <section class="final-cta">
       <div class="shell final-inner">
         <div>
-          <p class="eyebrow">Start with the roster</p>
-          <h2>Find the workers that earn a place on your floor.</h2>
+          <p class="eyebrow">Start with your request</p>
+          <h2>Let the coordinator plan privately and delegate from current evidence.</h2>
         </div>
         <div class="final-actions">
-          <a class="button button-inverse" href="https://github.com/scottconverse/codex-factory">Get Codex Factory 0.1.3</a>
+          <a class="button button-inverse" href="#coordinate">Coordinate from a prompt</a>
+          <a class="text-link light" href="https://github.com/scottconverse/codex-factory/releases/tag/v0.1.3">View v0.1.3 release <span aria-hidden="true">→</span></a>
           <a class="text-link light" href="https://github.com/scottconverse/codex-factory/blob/main/CONTRIBUTING.md">Contributing guide <span aria-hidden="true">→</span></a>
         </div>
       </div>

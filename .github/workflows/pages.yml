@@ -1,22 +1,21 @@
 name: Deploy website
 
 on:
+  pull_request:
+    branches: [main]
   push:
     branches: [main]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
-  group: pages
+  group: pages-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  build:
+  checks:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -26,12 +25,28 @@ jobs:
           node-version: 24
       - name: Test repository
         run: npm run check
+      - name: Measure built-in test coverage
+        run: npm run test:coverage
+      - name: Prove critical tests kill known defects
+        run: npm run test:mutation
+
+  build-pages:
+    if: github.event_name != 'pull_request'
+    needs: checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Build website
         run: npm run site:build
       - name: Check website
         run: npm run site:check
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -42,7 +57,11 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-pages
+    if: github.event_name != 'pull_request'
+    permissions:
+      pages: write
+      id-token: write
     steps:
       - name: Deploy to GitHub Pages
         id: deployment

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { rmSync, writeFileSync } from "node:fs";
+import { readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { buildInvocation, classifyResult, parseArgs, resolveRouteCandidate, summarizeLedger, summarizeUsage, taskWasAttempted, validateConfig } from "../scripts/run-worker.mjs";
@@ -122,6 +122,25 @@ test("summarizeLedger closes a paid lane when prior usage is unknown", () => {
     '{"stage":"terminal","taskId":"one","paid":true,"usage":{"total_tokens":25}}',
   ].join("\n");
   assert.equal(summarizeLedger(reconciled, true), 25);
+});
+
+test("summarizeLedger counts repeated legacy reservation-terminal sequences independently", () => {
+  const repeated = [
+    '{"stage":"reserved","taskId":"qualify-model-analysis","paid":true,"reservedTokens":100}',
+    '{"stage":"terminal","taskId":"qualify-model-analysis","paid":true,"usage":{"total_tokens":25}}',
+    '{"stage":"reserved","taskId":"qualify-model-analysis","paid":true,"reservedTokens":100}',
+    '{"stage":"terminal","taskId":"qualify-model-analysis","paid":true,"usage":{"total_tokens":30}}',
+  ].join("\n");
+  assert.equal(summarizeLedger(repeated, true), 55);
+});
+
+test("every Codex launcher shares paid admission and process supervision", () => {
+  const root = path.resolve(import.meta.dirname, "..");
+  for (const script of ["run-worker.mjs", "qualify-fleet.mjs", "fleet-smoke.mjs"]) {
+    const source = readFileSync(path.join(root, "scripts", script), "utf8");
+    assert.match(source, /from "\.\/factory-admission\.mjs"/, `${script} must use shared paid admission`);
+    assert.match(source, /from "\.\/factory-process\.mjs"/, `${script} must use shared process supervision`);
+  }
 });
 
 test("classifyResult requires a successful process, usage, output, and budget compliance", () => {

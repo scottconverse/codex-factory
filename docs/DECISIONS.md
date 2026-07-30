@@ -58,6 +58,11 @@ acceptable workaround for routine workers.
 
 ## 2026-07-29 — Keep the local 9B route read-only
 
+> Superseded for matching current fingerprints by later exact-runtime,
+> exact-adapter, exact-harness structured-write qualification. Historical
+> failures remain evidence, but the latest record for the exact fingerprint and
+> role controls admission.
+
 `qwen3.5:9b` satisfied the embedded-context read-only smoke contract, but in the
 writable worktree trial it only announced intended steps and made no tool call,
 write, test, or commit. It therefore remains qualified only for narrow

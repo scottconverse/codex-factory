@@ -2,6 +2,10 @@
 
 Version 0.1.3
 
+> Development note: prompt-driven coordinator intake on `main` is Unreleased
+> work after the `v0.1.3` tag. The version above remains the latest published
+> release until the owner selects the next version.
+
 ## What Codex Factory is
 
 Codex Factory is an experimental local supervisor for bounded AI software
@@ -44,13 +48,34 @@ npm.cmd run check
 
 No npm dependencies are required for the runner.
 
-The repository is also shaped as a Codex plugin. Version 0.1.1 does not install
-it automatically into a personal marketplace; operate it from the checkout.
+The repository is also shaped as a Codex plugin, but the checkout does not
+install itself. The supported checkout path is:
+
+1. Open the cloned Codex Factory checkout as the workspace for a new top-level
+   Codex task.
+2. Tell the currently selected model:
+
+   ```text
+   Read skills/codex-factory/SKILL.md completely and use it to coordinate this request.
+   Target repository: C:\work\my-project
+   Request: Add a health-check endpoint with tests.
+   ```
+
+3. Continue in that same task. The selected model is the coordinator; it owns
+   repository inspection, private planning, routing, integration, acceptance,
+   and communication.
+
+This is checkout operation, not marketplace installation. Do not invoke the
+skill by name unless you have separately installed a plugin version that
+provides it.
 
 ## Campaign coordination
 
-The top-level Codex session using the Factory skill is the owner-facing
-coordinator. The owner supplies a prompt, specification, or plan in normal
+The selected model in the top-level Codex task using the Factory skill is the
+owner-facing coordinator. It may be whatever Codex model the owner selected for
+that task; Luna and Terra remain campaign fallback workers, not the coordinator,
+unless the owner deliberately selected one as the top-level model. The owner
+supplies a prompt, specification, or plan in normal
 language. The coordinator inspects the target repository, decides whether to
 decompose, and writes the JSON campaign plan privately; the owner never needs
 to create that JSON.
@@ -134,7 +159,10 @@ visible but do not enter the subagent harness. Each result is bound to the exact
 provider, model, runtime version, adapter version, role, and harness. A failed
 structured-write qualification does not erase a passing analysis qualification.
 Mutating admission also requires the candidate to pass a derived structured-
-reasoning benchmark; a protocol-only write response is insufficient.
+reasoning benchmark; a protocol-only write response is insufficient. Current
+admission comes from the latest record for the exact fingerprint and role in
+the private qualification ledger. Historical results in tracked experiment
+documents do not override a newer exact-fingerprint record.
 
 | Role policy | Required qualification | Minimum tier | Sandbox |
 |---|---|---|---|
@@ -308,7 +336,7 @@ reservation remains charged.
 Codex currently reports token usage after the turn. Therefore the runner can
 reject an unsafe launch and reject an over-budget result, but it cannot
 interrupt a single model turn at an exact token count. The wall-clock timer and
-owned process tree are the hard runtime controls in 0.1.1.
+owned process tree are the current hard runtime controls.
 
 Local Ollama inference has no token-spend ceiling. It is bounded by wall time,
 concurrency, attempts, and context/output safety. Prompt and output token counts
@@ -346,6 +374,48 @@ Edit `factory.config.json` deliberately. Validation requires:
 
 Adding concurrency, retries, writable local routes, or a new provider changes
 the safety model and requires new tests and design evidence.
+
+## Frequently asked questions
+
+### Who is the coordinator?
+
+The active selected model in the top-level Codex task is the coordinator. It
+keeps requirements, architecture, the private `campaign.json`, integration,
+acceptance, and owner communication. Campaign workers are bounded leaves.
+
+### Do I write `campaign.json`?
+
+No. Give the coordinator a normal-language prompt, specification, or plan. It
+creates the JSON privately under Factory-owned ignored state.
+
+### Which qualification result is current?
+
+The latest record for the exact provider, model, runtime, adapter, harness, and
+role fingerprint controls admission. Tracked model ladders and bakeoff ledgers
+are historical evidence, not runtime allowlists.
+
+### Why can paid use exceed its reservation?
+
+Codex reports usage only after a turn. The ledger can prevent an unsafe launch
+and reject an over-reservation terminal result, but wall-clock supervision—not
+the reservation—is the in-turn stop.
+
+### Does `process_completed` mean the task passed?
+
+No. It proves only the recorded process and artifact conditions. The
+coordinator must inspect the result and run the acceptance checks.
+
+### Why is Critical work not sent to campaign workers?
+
+The campaign ladder is local, Luna, then Terra. Critical work stays with the
+coordinator or is split into bounded non-Critical leaves; Sol is not a campaign
+worker route.
+
+### Where are private artifacts retained?
+
+Coordinator intake, prompts, campaign plans, events, stderr, worker outputs,
+usage, and integration receipts stay below ignored `.codex-factory/` state.
+Review them before sharing because they may contain repository content.
 
 ## Troubleshooting
 

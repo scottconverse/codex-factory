@@ -10,7 +10,9 @@
 - Never retry automatically. Diagnose or return the failed receipt.
 - A task ID is single-use after its durable reservation is written.
 - Never exceed the aggregate paid-token ceiling. Unknown usage closes the paid lane.
-- One worker may run at a time until concurrency accounting is deliberately implemented.
+- Configure one to four worker slots; the checked-in policy uses three.
+  Only dependency-ready `parallelSafe` campaign tasks with non-overlapping read/write
+  paths may share a batch. Paid admission remains serialized under the ledger lock.
 - Every execution must retain its prompt, JSONL events, stderr, final message, usage,
   exit status, model, provider, and timestamps under `.codex-factory/runs/`.
 - Local models receive read-only work until a recorded qualification proves the tools and
@@ -20,5 +22,5 @@
   role scoped; never turn one failed role into a global model exclusion.
 - `process_completed` proves only a reaped CLI process, terminal usage, and a nonempty
   final artifact. It does not prove the task acceptance criteria.
-- Do not add MCP, marketplace installation, UI, or additional providers until the
-  supervised CLI runner passes its bakeoff acceptance criteria.
+- Do not add a PM control room, MCP server, marketplace publication, or additional
+  providers without an explicit product decision and matching safety evidence.

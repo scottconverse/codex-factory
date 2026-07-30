@@ -167,6 +167,26 @@ test("routing rejects stale qualifications after a runtime fingerprint changes",
   );
 });
 
+test("OpenAI qualification fingerprint changes with reasoning effort and tier", () => {
+  const base = {
+    id: "openai:gpt-5.6-luna",
+    provider: "openai",
+    model: "gpt-5.6-luna",
+    runtimeVersion: "codex-cli 1.2.3",
+    adapterVersion: "codex-exec-v1",
+    tier: "economy",
+    reasoningEffort: "low",
+  };
+  assert.notEqual(
+    candidateFingerprint(base, "analysis"),
+    candidateFingerprint({ ...base, reasoningEffort: "high" }, "analysis"),
+  );
+  assert.notEqual(
+    candidateFingerprint(base, "analysis"),
+    candidateFingerprint({ ...base, tier: "standard" }, "analysis"),
+  );
+});
+
 test("the latest result for an exact qualification replaces older evidence", () => {
   const candidate = discoverCandidatePool({
     config: { candidates: { openai: [] } },

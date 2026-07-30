@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 export const QUALIFICATION_HARNESSES = Object.freeze({
   analysis: "analysis-exact-artifact-v1",
@@ -33,13 +34,23 @@ function normalizeOpenAiCandidate(value) {
     id: candidateId("openai", value.model),
     provider: "openai",
     model: value.model,
-    runtimeVersion: value.runtimeVersion ?? "codex-cli-current",
+    runtimeVersion: value.runtimeVersion ?? detectCodexRuntimeVersion(),
     adapterVersion: "codex-exec-v1",
     tier: value.tier,
     reasoningEffort: value.reasoningEffort,
     paid: true,
     tokenReservation: value.tokenReservation ?? null,
   };
+}
+
+let detectedCodexRuntimeVersion;
+export function detectCodexRuntimeVersion() {
+  if (detectedCodexRuntimeVersion) return detectedCodexRuntimeVersion;
+  const command = process.platform === "win32" ? "codex.exe" : "codex";
+  const result = spawnSync(command, ["--version"], { encoding: "utf8", windowsHide: true });
+  const text = `${result.stdout ?? ""}${result.stderr ?? ""}`.trim();
+  detectedCodexRuntimeVersion = result.status === 0 && text ? text : "codex-cli-unavailable";
+  return detectedCodexRuntimeVersion;
 }
 
 export function parseOllamaDiscovery(versionPayload, tagsPayload) {
@@ -116,6 +127,8 @@ export function candidateFingerprint(candidate, role) {
     runtimeVersion: candidate.runtimeVersion,
     adapterVersion: candidate.adapterVersion,
     capabilities: candidate.capabilities ?? [],
+    tier: candidate.tier,
+    reasoningEffort: candidate.reasoningEffort,
     harness,
   })).digest("hex");
 }
