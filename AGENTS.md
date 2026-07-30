@@ -7,7 +7,9 @@
 - A worker needs a task ID, acceptance criteria, writable scope, pricing-tier
   controls, a wall-clock limit, and deterministic exit before execution.
 - Dry-run is the default. Model execution requires an explicit `--execute`.
-- Never retry automatically. Diagnose or return the failed receipt.
+- Do not retry the same candidate route. Diagnose or return its failed receipt.
+  A reviewed campaign may advance once through its previewed local, Luna, and
+  Terra ladder; containment or infrastructure failures abort that ladder.
 - A task ID is single-use after its durable reservation is written.
 - Never exceed the aggregate paid-token ceiling. Unknown usage closes the paid lane.
 - Configure one to four worker slots; the checked-in policy uses three.

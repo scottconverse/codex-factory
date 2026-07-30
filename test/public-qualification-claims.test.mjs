@@ -37,3 +37,11 @@ test("public retry copy distinguishes one invocation per route from automatic fa
   assert.match(publicText, /automatically advances through the reviewed local,\s+Luna,\s+and Terra ladder/i);
   assert.doesNotMatch(publicText, /single-use task IDs and no automatic retries/i);
 });
+
+test("repository agent contract permits the documented preview-authorized fallback ladder", () => {
+  const agents = read("AGENTS.md");
+
+  assert.match(agents, /do not retry the same candidate route/i);
+  assert.match(agents, /reviewed campaign may advance once through.*local.*Luna.*Terra/is);
+  assert.doesNotMatch(agents, /Never retry automatically/);
+});
