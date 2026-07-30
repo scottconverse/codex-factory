@@ -18,6 +18,7 @@ import { superviseProcess } from "../scripts/factory-process.mjs";
 
 const PROJECT = path.resolve(import.meta.dirname, "..");
 const FAKE_CODEX = path.join(import.meta.dirname, "fixtures", "fake-codex.mjs");
+const FAKE_OLLAMA = path.join(import.meta.dirname, "fixtures", "fake-ollama.mjs");
 
 function run(command, args, options = {}) {
   return spawnSync(command, args, {
@@ -78,6 +79,26 @@ function qualify(root, markerPath, role = "workspace_write") {
     "--include-paid",
     "--execute",
   ], { cwd: root, env: fakeEnvironment(root, markerPath) });
+}
+
+function startFakeOllama() {
+  const child = spawn(process.execPath, [FAKE_OLLAMA], {
+    stdio: ["ignore", "ignore", "inherit", "ipc"],
+    windowsHide: true,
+  });
+  return new Promise((resolve, reject) => {
+    child.once("error", reject);
+    child.once("message", ({ port }) => resolve({
+      child,
+      baseUrl: `http://127.0.0.1:${port}`,
+    }));
+  });
+}
+
+function stopFakeOllama(child) {
+  if (!child || child.exitCode !== null) return Promise.resolve();
+  child.send("close");
+  return new Promise((resolve) => child.once("close", resolve));
 }
 
 test("paid qualification crosses a fake executable only after reservation and reconciles the same invocation", () => {
@@ -189,6 +210,83 @@ test("paid OpenAI smoke reserves each fake process and reconciles both invocatio
   assert.notEqual(denied.status, 0);
   assert.match(denied.stderr, /exceeds remaining budget/);
   assert.equal(records(markerPath).length, started.length, "denied smoke must not spawn");
+});
+
+test("local patch crosses fake Ollama and records an accepted bounded commit", async (t) => {
+  const root = isolatedFactory();
+  const ollama = await startFakeOllama();
+  t.after(async () => {
+    await stopFakeOllama(ollama.child);
+    rmSync(root, { recursive: true, force: true });
+  });
+  const env = { ...process.env, CODEX_FACTORY_TEST_OLLAMA_URL: ollama.baseUrl };
+  for (const role of ["benchmark", "structured_write"]) {
+    const qualification = run(process.execPath, [
+      path.join(root, "scripts", "qualify-fleet.mjs"),
+      "--provider", "ollama",
+      "--model", "qwen3.5:14b",
+      "--role", role,
+      "--execute",
+    ], { cwd: root, env });
+    assert.equal(qualification.status, 0, qualification.stderr || qualification.stdout);
+  }
+
+  const repository = path.join(root, "local-owner");
+  mkdirSync(repository);
+  git(repository, ["init"]);
+  git(repository, ["config", "user.name", "Boundary Test"]);
+  git(repository, ["config", "user.email", "boundary@example.invalid"]);
+  writeFileSync(path.join(repository, "verify.mjs"), [
+    'import { readFileSync } from "node:fs";',
+    'if (readFileSync("src/result.txt", "utf8") !== "built by local executable\\n") process.exit(1);',
+  ].join("\n"));
+  git(repository, ["add", "."]);
+  git(repository, ["commit", "-m", "fixture"]);
+  const ownerHead = git(repository, ["rev-parse", "HEAD"]);
+  const taskPath = path.join(root, "local-task.json");
+  writeFileSync(taskPath, `${JSON.stringify({
+    version: 1,
+    taskId: `local-boundary-${process.pid}`,
+    repository,
+    base: ownerHead,
+    model: "qwen3.5:14b",
+    requiredTier: "standard",
+    timeoutMinutes: 1,
+    maxOutputTokens: 256,
+    maxContextBytes: 16_384,
+    instructions: "Create src/result.txt with the exact content required by verify.mjs.",
+    readPaths: ["verify.mjs"],
+    writePaths: ["src/result.txt"],
+    check: { command: process.execPath, args: ["verify.mjs"] },
+    commitMessage: "feat: local executable boundary result",
+  }, null, 2)}\n`);
+
+  const local = run(process.execPath, [
+    path.join(root, "scripts", "run-local-patch.mjs"),
+    "--task-file", taskPath,
+    "--execute",
+  ], { cwd: root, env, timeout: 30_000 });
+  assert.equal(local.status, 0, local.stderr || local.stdout);
+  const result = JSON.parse(local.stdout);
+  assert.equal(result.status, "accepted");
+  assert.deepEqual(result.changedPaths, ["src/result.txt"]);
+  assert.deepEqual(result.telemetry, {
+    promptTokens: 11,
+    outputTokens: 7,
+    totalTokens: 18,
+    totalDurationNs: 1,
+  });
+  assert.equal(readFileSync(path.join(result.worktreePath, "src", "result.txt"), "utf8"), "built by local executable\n");
+  assert.notEqual(result.commit, ownerHead);
+  const ledger = records(path.join(root, ".codex-factory", "local-patch", "ledger.jsonl"));
+  assert.deepEqual(ledger.map(({ stage, status }) => ({ stage, status })), [
+    { stage: "started", status: undefined },
+    { stage: "terminal", status: "accepted" },
+  ]);
+  const slotsPath = path.join(root, ".codex-factory", "slots");
+  assert.equal(existsSync(slotsPath) ? readdirSync(slotsPath).length : 0, 0);
+  git(repository, ["worktree", "remove", "--force", result.worktreePath]);
+  git(repository, ["branch", "-D", result.branch]);
 });
 
 test("real supervisor reaps a child and grandchild on timeout before resolving and removes listeners", async () => {

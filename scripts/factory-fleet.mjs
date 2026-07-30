@@ -93,7 +93,21 @@ export function parseOllamaDiscovery(versionPayload, tagsPayload) {
   return { runtimeVersion, models };
 }
 
-export async function discoverOllama(baseUrl = "http://127.0.0.1:11434", fetchImpl = fetch) {
+export function ollamaBaseUrl(env = process.env) {
+  const configured = env.CODEX_FACTORY_TEST_OLLAMA_URL ?? "http://127.0.0.1:11434";
+  let parsed;
+  try {
+    parsed = new URL(configured);
+  } catch {
+    throw new Error("CODEX_FACTORY_TEST_OLLAMA_URL must be a valid HTTP URL");
+  }
+  if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new Error("CODEX_FACTORY_TEST_OLLAMA_URL must be a valid HTTP URL without credentials, query, or fragment");
+  }
+  return configured.replace(/\/+$/, "");
+}
+
+export async function discoverOllama(baseUrl = ollamaBaseUrl(), fetchImpl = fetch) {
   const normalized = baseUrl.replace(/\/+$/, "");
   const [versionResponse, tagsResponse] = await Promise.all([
     fetchImpl(`${normalized}/api/version`),

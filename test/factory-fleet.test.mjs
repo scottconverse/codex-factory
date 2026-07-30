@@ -3,10 +3,23 @@ import test from "node:test";
 import {
   candidateFingerprint,
   discoverCandidatePool,
+  ollamaBaseUrl,
   parseOllamaDiscovery,
   qualificationPlan,
   selectCandidate,
 } from "../scripts/factory-fleet.mjs";
+
+test("ollamaBaseUrl accepts an explicit operator endpoint and rejects malformed values", () => {
+  assert.equal(ollamaBaseUrl({}), "http://127.0.0.1:11434");
+  assert.equal(
+    ollamaBaseUrl({ CODEX_FACTORY_TEST_OLLAMA_URL: "http://127.0.0.1:32100/" }),
+    "http://127.0.0.1:32100",
+  );
+  assert.throws(
+    () => ollamaBaseUrl({ CODEX_FACTORY_TEST_OLLAMA_URL: "not a URL" }),
+    /valid HTTP URL/,
+  );
+});
 
 const config = {
   candidates: {

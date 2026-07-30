@@ -16,6 +16,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   discoverCandidatePool,
   discoverOllama,
+  ollamaBaseUrl,
   codexLauncher,
   qualificationPlan,
 } from "./factory-fleet.mjs";
@@ -171,7 +172,7 @@ async function fetchWithTimeout(url, init, timeoutMs) {
 async function qualifyLocal(item, timeoutMs) {
   const startedAtMs = Date.now();
   try {
-    const response = await fetchWithTimeout("http://127.0.0.1:11434/api/generate", {
+    const response = await fetchWithTimeout(`${ollamaBaseUrl()}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(localRequest(item)),

@@ -15,7 +15,7 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseCliArgs, printHelp, reportCliError } from "./factory-cli.mjs";
-import { discoverCandidatePool, discoverOllama, selectCandidate } from "./factory-fleet.mjs";
+import { discoverCandidatePool, discoverOllama, ollamaBaseUrl, selectCandidate } from "./factory-fleet.mjs";
 import { acquireFileLock, acquireWorkerSlot } from "./factory-slots.mjs";
 import { prepareDeclaredWritePath } from "./factory-process.mjs";
 
@@ -27,7 +27,6 @@ Options:
   --task-file <file>  Required bounded local-patch task JSON.
   --execute           DANGEROUS: apply and check model-generated writes; otherwise dry-run.
   -h, --help          Show this help.`;
-const OLLAMA_GENERATE_URL = "http://127.0.0.1:11434/api/generate";
 const TASK_ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,63}$/;
 const PLAIN_EXECUTABLE_PATTERN = /^(?:[A-Za-z]:\\[^&|<>\r\n]+|\/[^&|<>\r\n]+|[A-Za-z0-9._-]+)$/;
 
@@ -244,7 +243,7 @@ async function requestOllama(request, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(OLLAMA_GENERATE_URL, {
+    const response = await fetch(`${ollamaBaseUrl()}/api/generate`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify(request),
