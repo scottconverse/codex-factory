@@ -97,7 +97,7 @@ qualification, routes, receipts, recovery, and FAQ.
 
 ## Important boundary
 
-Codex reports token usage after a model turn. Version 0.1.4 can reject an unsafe
+Codex reports token usage after a model turn. Version 0.1.5 can reject an unsafe
 launch and mark a terminal result over budget, but it cannot interrupt a single
 turn at an exact token count. Wall-clock timeout and process ownership are the
 hard runtime controls.
@@ -137,16 +137,17 @@ begins. Those
 host-specific records remain private; tracked examples are not runtime
 allowlists.
 
-Version 0.1.4 publishes the prompt-driven coordinator intake, private campaign
-planning, qualified local-first fallback routing, and the related receipt,
-containment, cleanup, and public-onboarding improvements.
+Version 0.1.5 retains the prompt-driven coordinator intake, private campaign
+planning, qualified local-first fallback routing, and related safety controls.
+Qualification checks now create and clean up their own fixtures, so each check
+can run independently.
 
 ## Project documents
 
 - [User manual](docs/USER-MANUAL.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [Worker model ladder](docs/MODEL-LADDER.md)
-- [0.1.4 release notes](docs/RELEASE-NOTES-0.1.4.md)
+- [0.1.5 release notes](docs/RELEASE-NOTES-0.1.5.md)
 - [Capability matrix](docs/CAPABILITY-MATRIX.md)
 - [Experiment plan](docs/EXPERIMENT-PLAN.md)
 - [Bakeoff ledger](docs/BAKEOFF-LEDGER.md)

@@ -4,6 +4,13 @@ All notable changes to Codex Factory are documented here.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-30
+
+### Fixed
+
+- Qualification checks now create and clean up their own fixtures so each
+  check can run independently without relying on state left by another check.
+
 ## [0.1.4] - 2026-07-30
 
 ### Added
