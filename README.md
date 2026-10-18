@@ -1,3 +1,5 @@
+> **Archived October 17, 2026.** The Codex lane of [DevHarmonics](https://github.com/scottconverse/DevHarmonics). DevHarmonics ported admission and slots in full (and grew them), and ported fleet discovery, qualification, the worker runner, the local-patch runner and the CLI with adaptation. It did **not** port (checked Oct 17, 2026 by export name): the campaign layer (`factory-campaign.mjs`, `run-campaign.mjs`), `coordinator-intake.mjs`, `fleet-smoke.mjs`, `subprocess-coverage-check.mjs`, `mutation-check.mjs`, `prepareDeclaredWritePath` from `factory-process.mjs`, the release and site scripts, the Codex skill and plugin manifest, or the DECISIONS / MODEL-LADDER / BAKEOFF-LEDGER documents. All of it remains readable here, with its tests. No `.codex-factory/` state folder exists on the owner's machine, so nothing is running it. This repository is read-only; history and issues are preserved.
+
 # Codex Factory
 
 **Give AI workers a shift, not a blank check.**
